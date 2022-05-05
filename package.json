@@ -1,7 +1,7 @@
 {
   "name": "sequelize-papandreou",
   "description": "Multi dialect ORM for Node.JS",
-  "version": "0.0.0-development",
+  "version": "5.22.5-patch1",
   "author": "Sascha Depold <sascha@depold.com>",
   "contributors": [
     "Sascha Depold <sascha@depold.com>",
