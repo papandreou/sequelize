@@ -836,7 +836,7 @@ ${associationOwner._getAssociationDebugList()}`);
 
     const existingIndexes = await this.queryInterface.showIndex(tableName, options);
     const missingIndexes = this.getIndexes()
-      .filter(item1 => !existingIndexes.some(item2 => item1.name === item2.name))
+      .filter(item1 => !existingIndexes.some(item2 => item1.name.startsWith(item2.name)))
       .sort((index1, index2) => {
         if (this.sequelize.options.dialect === 'postgres') {
           // move concurrent indexes to the bottom to avoid weird deadlocks
