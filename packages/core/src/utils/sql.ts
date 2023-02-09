@@ -155,12 +155,12 @@ function mapBindParametersAndReplacements(
       if (onBind) {
         // we want to be conservative with what we consider to be a bind parameter to avoid risk of conflict with potential operators
         // users need to add a space before the bind parameter (except after '(', ',', and '=')
-        if (!canPrecedeNewToken(previousChar)) {
+        if (!canPrecedeNewToken(previousChar) && previousChar !== '[') {
           continue;
         }
 
         // detect the bind param if it's a valid identifier and it's followed either by '::' (=cast), ')', whitespace of it's the end of the query.
-        const match = remainingString.match(/^\$(?<name>([a-z_][0-9a-z_]*|[1-9][0-9]*))(?:\)|,|$|\s|::|;)/i);
+        const match = remainingString.match(/^\$(?<name>([a-z_][0-9a-z_]*|[1-9][0-9]*))(?:\]|\)|,|$|\s|::|;)/i);
         const bindParamName = match?.groups?.name;
         if (!bindParamName) {
           continue;
