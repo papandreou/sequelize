@@ -495,9 +495,9 @@ export abstract class AbstractDialect {
   registerDataTypeParser(databaseDataTypes: unknown[], parser: TypeParser) {
     for (const databaseDataType of databaseDataTypes) {
       // jfo: this catches https://sequelize.slack.com/archives/C0CELV3N1/p1675930451860569?thread_ts=1675615423.972829&cid=C0CELV3N1
-      // if (this.#dataTypeParsers.has(databaseDataType)) {
-      //   throw new Error(`Sequelize DataType for DB DataType ${databaseDataType} already registered for dialect ${this.name}`);
-      // }
+      if (this.#dataTypeParsers.has(databaseDataType)) {
+        throw new Error(`Sequelize DataType for DB DataType ${databaseDataType} already registered for dialect ${this.name}`);
+      }
 
       this.#dataTypeParsers.set(databaseDataType, parser);
     }
