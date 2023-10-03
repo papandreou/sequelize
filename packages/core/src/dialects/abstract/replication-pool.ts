@@ -6,7 +6,7 @@ const debug = logger.debugContext('pool');
 
 export type ConnectionType = 'read' | 'write';
 
-type ReplicationPoolConfig<Resource> = {
+export type ReplicationPoolConfig<Resource> = {
   readConfig: ConnectionOptions[] | null,
   writeConfig: ConnectionOptions,
   pool: Omit<NormalizedPoolOptions, 'validate'>,
