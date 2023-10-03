@@ -27,6 +27,12 @@ export interface GetConnectionOptions {
    * ID of the connection.
    */
   uuid?: string | 'default';
+
+  /**
+   * ID of the shard to get connection from.
+   */
+
+  shardId?: string;
 }
 
 export interface Connection {
