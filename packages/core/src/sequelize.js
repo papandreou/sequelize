@@ -369,6 +369,25 @@ export class Sequelize extends SequelizeTypeScript {
       dialectOptions: this.options.dialectOptions,
     };
 
+    if (!this.options.sharding && !Array.isArray(this.options.sharding)) {
+      this.options.sharding = [];
+    }
+
+    // Convert sharding connection strings toects
+    for (let i = 0; i < this.options.sharding; i++) {
+      this.options.sharding.shards[i].write = parseConnectionString(this.options.sharding.shards[i].write);
+      this.options.sharding.shards[i].write.port = Number(this.options.sharding.shards[i].write.port);
+      this.options.sharding.shards[i].read = this.options.sharding.shards[i].read.map(readEntry => {
+        if (isString(readEntry)) {
+          readEntry = parseConnectionString(readEntry);
+        }
+
+        readEntry.port = Number(readEntry.port);
+
+        return defaults(readEntry, connectionConfig);
+      });
+    }
+
     if (!this.options.replication) {
       this.options.replication = Object.create(null);
     }
@@ -407,6 +426,7 @@ export class Sequelize extends SequelizeTypeScript {
       ...connectionConfig,
       pool: this.options.pool,
       native: this.options.native,
+      sharding: this.options.sharding,
       replication: this.options.replication,
       dialectModule: this.options.dialectModule,
       dialectModulePath: this.options.dialectModulePath,
