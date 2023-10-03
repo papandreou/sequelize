@@ -7,6 +7,7 @@ import { isNodeError } from '../../utils/check.js';
 import * as deprecations from '../../utils/deprecations';
 import { logger } from '../../utils/logger';
 import { ReplicationPool } from './replication-pool.js';
+import { ShardPool } from './shard-pool';
 import type { AbstractDialect } from './index.js';
 
 const debug = logger.debugContext('connection-manager');
@@ -49,6 +50,7 @@ export class AbstractConnectionManager<TConnection extends Connection = Connecti
   protected readonly dialect: AbstractDialect;
   protected readonly dialectName: Dialect;
   readonly pool: ReplicationPool<TConnection>;
+  readonly shardPool: ShardPool<TConnection>;
 
   #versionPromise: Promise<void> | null = null;
   #closed: boolean = false;
@@ -62,32 +64,64 @@ export class AbstractConnectionManager<TConnection extends Connection = Connecti
     this.dialectName = this.sequelize.options.dialect;
 
     // ===========================================================
-    // Init Pool
+    // Init ShardPools
     // ===========================================================
+    if (config.sharding) {
+      this.pool = Object.create(null);
 
-    this.pool = new ReplicationPool<TConnection>({
-      ...config,
-      connect: async (options: ConnectionOptions): Promise<TConnection> => {
-        return this._connect(options);
-      },
-      disconnect: async (connection: TConnection): Promise<void> => {
-        return this._disconnect(connection);
-      },
-      validate: (connection: TConnection): boolean => {
-        if (config.pool.validate) {
-          return config.pool.validate(connection);
-        }
+      const shardConfigs = config.sharding.shards.map(shard => {
+        return {
+          shardId: shard.shardId,
+          readConfig: shard.read,
+          writeConfig: shard.write,
+          pool: config.pool,
+          connect: async (options: ConnectionOptions): Promise<TConnection> => {
+            return this._connect(options);
+          },
+          disconnect: async (connection: TConnection): Promise<void> => {
+            return this._disconnect(connection);
+          },
+          validate: (connection: TConnection): boolean => {
+            if (config.pool.validate) {
+              return config.pool.validate(connection);
+            }
 
-        return this.validate(connection);
-      },
-      readConfig: config.replication.read,
-      writeConfig: config.replication.write,
-    });
+            return this.validate(connection);
+          },
 
-    if (config.replication.read.length > 0) {
-      debug(`pool created with max/min: ${config.pool.max}/${config.pool.min}, no replication`);
+        };
+      });
+      this.shardPool = new ShardPool<TConnection>({ shards: shardConfigs });
+
     } else {
-      debug(`pool created with max/min: ${config.pool.max}/${config.pool.min}, with replication`);
+      // ===========================================================
+      // Init Pool
+      // ===========================================================
+
+      this.pool = new ReplicationPool<TConnection>({
+        ...config,
+        connect: async (options: ConnectionOptions): Promise<TConnection> => {
+          return this._connect(options);
+        },
+        disconnect: async (connection: TConnection): Promise<void> => {
+          return this._disconnect(connection);
+        },
+        validate: (connection: TConnection): boolean => {
+          if (config.pool.validate) {
+            return config.pool.validate(connection);
+          }
+
+          return this.validate(connection);
+        },
+        readConfig: config.replication.read,
+        writeConfig: config.replication.write,
+      });
+
+      if (config.replication.read.length > 0) {
+        debug(`pool created with max/min: ${config.pool.max}/${config.pool.min}, no replication`);
+      } else {
+        debug(`pool created with max/min: ${config.pool.max}/${config.pool.min}, with replication`);
+      }
     }
   }
 
