@@ -251,7 +251,7 @@ export class AbstractConnectionManager<TConnection extends Connection = Connecti
 
   getDefaultConnectionOptions(): ConnectionOptions {
     if (this.config.sharding?.shards) {
-      return this.config.sharding.shards[0].writeConfig;
+      return this.config.sharding.shards[0].write;
     }
 
     return this.config.replication.write || this.config;
