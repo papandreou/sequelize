@@ -184,6 +184,7 @@ export class Sequelize extends SequelizeTypeScript {
    * @param {boolean}  [options.omitNull=false] A flag that defines if null values should be passed as values to CREATE/UPDATE SQL queries or not.
    * @param {boolean}  [options.native=false] A flag that defines if native library shall be used or not. Currently only has an effect for postgres
    * @param {boolean}  [options.ssl=undefined] A flag that defines if connection should be over ssl or not
+   * @param {boolean}  [options.sharding=false] A flag that defines if sharding is enabled or not
    * @param {boolean}  [options.replication=false] Use read / write replication. To enable replication, pass an object, with two properties, read and write. Write should be an object (a single server for handling writes), and read an array of object (several servers to handle reads). Each read/write server can have the following properties: `host`, `port`, `username`, `password`, `database`.  Connection strings can be used instead of objects.
    * @param {object}   [options.pool] sequelize connection pool configuration
    * @param {number}   [options.pool.max=5] Maximum number of connection in pool
@@ -369,14 +370,18 @@ export class Sequelize extends SequelizeTypeScript {
       dialectOptions: this.options.dialectOptions,
     };
 
-    if (!this.options.sharding && !Array.isArray(this.options.sharding)) {
-      this.options.sharding = [];
+    if (!this.options.sharding) {
+      this.options.sharding = Object.create(null);
     }
 
-    // Convert sharding connection strings toects
-    for (let i = 0; i < this.options.sharding; i++) {
-      this.options.sharding.shards[i].write = parseConnectionString(this.options.sharding.shards[i].write);
+    // Convert sharding connection strings to objects
+    for (let i = 0; i < this.options.sharding.shards?.length; i++) {
+      if (isString(this.options.replication.write)) {
+        this.options.sharding.shards[i].write = parseConnectionString(this.options.sharding.shards[i].write);
+      }
+
       this.options.sharding.shards[i].write.port = Number(this.options.sharding.shards[i].write.port);
+
       this.options.sharding.shards[i].read = this.options.sharding.shards[i].read.map(readEntry => {
         if (isString(readEntry)) {
           readEntry = parseConnectionString(readEntry);
