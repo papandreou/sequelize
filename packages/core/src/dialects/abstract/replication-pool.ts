@@ -1,10 +1,17 @@
+
 import { Pool } from 'sequelize-pool';
 import type { ConnectionOptions, NormalizedPoolOptions } from '../../sequelize.js';
 import { logger } from '../../utils/logger.js';
+import type {
+  BasePoolAcquireOptions,
+  BasePoolDestroyOptions,
+  BasePoolGetPoolOptions,
+  BasePoolReleaseOptions,
+  BaseReplicationPool,
+  ConnectionType,
+} from './base-replication-pool.js';
 
 const debug = logger.debugContext('pool');
-
-export type ConnectionType = 'read' | 'write';
 
 export type ReplicationPoolConfig<Resource> = {
   readConfig: ConnectionOptions[] | null,
@@ -16,9 +23,21 @@ export type ReplicationPoolConfig<Resource> = {
   validate(connection: Resource): boolean,
 };
 
+export type ReplicationPoolAcquireOptions = BasePoolAcquireOptions & {
+ type: ConnectionType, useMaster: boolean,
+};
+export type ReplicationPoolReleaseOptions<Resource> = BasePoolReleaseOptions &
+{ connection: Resource };
+
+export type ReplicationPoolDestroyOptions<Resource> = BasePoolDestroyOptions &
+{ connection: Resource };
+
+export type ReplicationPoolGetPoolOptions = BasePoolGetPoolOptions &
+{ poolType: ConnectionType };
+
 const owningPools = new WeakMap<object, 'read' | 'write'>();
 
-export class ReplicationPool<Resource extends object> {
+export class ReplicationPool<Resource extends object> implements BaseReplicationPool<Resource> {
   /**
    * Replication read pool. Will only be used if the 'read' replication option has been provided,
    * otherwise the {@link write} will be used instead.
@@ -27,6 +46,7 @@ export class ReplicationPool<Resource extends object> {
   readonly write: Pool<Resource>;
 
   constructor(config: ReplicationPoolConfig<Resource>) {
+
     const { connect, disconnect, validate, readConfig, writeConfig } = config;
 
     if (!readConfig || readConfig.length === 0) {
@@ -77,34 +97,35 @@ export class ReplicationPool<Resource extends object> {
     });
   }
 
-  async acquire(queryType: ConnectionType = 'write', useMaster = false) {
-    if (queryType !== 'read' && queryType !== 'write') {
-      throw new Error(`Expected queryType to be either read or write. Received ${queryType}`);
+  async acquire({ type = 'write', useMaster = false }: ReplicationPoolAcquireOptions): Promise<Resource> {
+    if (type !== 'read' && type !== 'write') {
+      throw new Error(`Expected queryType to be either read or write. Received ${type}`);
     }
 
-    if (this.read != null && queryType === 'read' && !useMaster) {
+    if (this.read != null && type === 'read' && !useMaster) {
       return this.read.acquire();
     }
 
     return this.write.acquire();
   }
 
-  release(client: Resource): void {
-    const connectionType = owningPools.get(client);
+  release({ connection }: ReplicationPoolReleaseOptions<Resource>): void {
+
+    const connectionType = owningPools.get(connection);
     if (!connectionType) {
       throw new Error('Unable to determine to which pool the connection belongs');
     }
 
-    this.getPool(connectionType).release(client);
+    this.getPool({ poolType: connectionType }).release(connection);
   }
 
-  async destroy(client: Resource): Promise<void> {
-    const connectionType = owningPools.get(client);
+  async destroy({ connection }: ReplicationPoolDestroyOptions<Resource>): Promise<void> {
+    const connectionType = owningPools.get(connection);
     if (!connectionType) {
       throw new Error('Unable to determine to which pool the connection belongs');
     }
 
-    await this.getPool(connectionType).destroy(client);
+    await this.getPool({ poolType: connectionType }).destroy(connection);
     debug('connection destroy');
   }
 
@@ -124,7 +145,7 @@ export class ReplicationPool<Resource extends object> {
     ]);
   }
 
-  getPool(poolType: ConnectionType): Pool<Resource> {
+  getPool({ poolType }: ReplicationPoolGetPoolOptions): Pool<Resource> {
     if (poolType === 'read' && this.read != null) {
       return this.read;
     }
