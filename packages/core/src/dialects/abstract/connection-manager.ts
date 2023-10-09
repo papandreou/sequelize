@@ -6,13 +6,14 @@ import type { ConnectionOptions, Dialect, Sequelize } from '../../sequelize.js';
 import { isNodeError } from '../../utils/check.js';
 import * as deprecations from '../../utils/deprecations';
 import { logger } from '../../utils/logger';
+import type { BasePoolAcquireOptions, BaseReplicationPool } from './base-replication-pool';
 import { ReplicationPool } from './replication-pool.js';
-import { ShardPool } from './shard-pool';
+import { ShardedReplicationPool } from './sharded-replication-pool';
 import type { AbstractDialect } from './index.js';
 
 const debug = logger.debugContext('connection-manager');
 
-export interface GetConnectionOptions {
+export interface GetConnectionOptions extends BasePoolAcquireOptions {
   /**
    * Set which replica to use. Available options are `read` and `write`
    */
@@ -32,13 +33,15 @@ export interface GetConnectionOptions {
    * ID of the shard to get connection from.
    */
 
-  shardId?: string;
+  shardId?: string | undefined;
 }
 
 export interface Connection {
   /** custom property we attach to different dialect connections */
   // TODO: replace with Symbols.
   uuid?: string | undefined;
+
+  shardId?: string | undefined;
 }
 
 /**
@@ -55,8 +58,7 @@ export class AbstractConnectionManager<TConnection extends Connection = Connecti
   protected readonly config: Sequelize['config'];
   protected readonly dialect: AbstractDialect;
   protected readonly dialectName: Dialect;
-  readonly pool: ReplicationPool<TConnection>;
-  readonly shardPool: ShardPool<TConnection>;
+  readonly pool: BaseReplicationPool<TConnection>;
 
   #versionPromise: Promise<void> | null = null;
   #closed: boolean = false;
@@ -70,36 +72,41 @@ export class AbstractConnectionManager<TConnection extends Connection = Connecti
     this.dialectName = this.sequelize.options.dialect;
 
     // ===========================================================
-    // Init ShardPools
+    // Init ShardPool
     // ===========================================================
-    if (config.sharding) {
-      this.pool = Object.create(null);
+    if (config.sharding?.shards) {
 
-      const shardConfigs = config.sharding.shards.map(shard => {
+      const shards = config.sharding.shards.map(shard => {
         return {
           shardId: shard.shardId,
           readConfig: shard.read,
           writeConfig: shard.write,
-          pool: config.pool,
-          connect: async (options: ConnectionOptions): Promise<TConnection> => {
-            return this._connect(options);
-          },
-          disconnect: async (connection: TConnection): Promise<void> => {
-            return this._disconnect(connection);
-          },
-          validate: (connection: TConnection): boolean => {
-            if (config.pool.validate) {
-              return config.pool.validate(connection);
-            }
-
-            return this.validate(connection);
-          },
-
         };
       });
-      this.shardPool = new ShardPool<TConnection>({ shards: shardConfigs });
+
+      this.pool = new ShardedReplicationPool<TConnection>({
+        ...config,
+        connect: async (options: ConnectionOptions): Promise<TConnection> => {
+          return this._connect(options);
+        },
+        disconnect: async (connection: TConnection): Promise<void> => {
+          return this._disconnect(connection);
+        },
+        validate: (connection: TConnection): boolean => {
+          if (config.pool.validate) {
+            return config.pool.validate(connection);
+          }
+
+          return this.validate(connection);
+        },
+        shards,
+        pool: config.pool,
+      });
+
+      debug(`pool created with the number of ${config.sharding.shards}  and with each shard pool max/min: ${config.pool.max}/${config.pool.min}, with sharding`);
 
     } else {
+
       // ===========================================================
       // Init Pool
       // ===========================================================
@@ -128,6 +135,7 @@ export class AbstractConnectionManager<TConnection extends Connection = Connecti
       } else {
         debug(`pool created with max/min: ${config.pool.max}/${config.pool.min}, with replication`);
       }
+
     }
   }
 
@@ -225,7 +233,7 @@ export class AbstractConnectionManager<TConnection extends Connection = Connecti
 
       await this.sequelize.hooks.runAsync('beforePoolAcquire', options);
 
-      const result = await this.pool.acquire(options?.type, options?.useMaster);
+      const result = await this.pool.acquire({ ...options });
 
       await this.sequelize.hooks.runAsync('afterPoolAcquire', result, options);
 
@@ -241,6 +249,15 @@ export class AbstractConnectionManager<TConnection extends Connection = Connecti
     }
   }
 
+  getDefaultConnectionOptions(): ConnectionOptions {
+    if (this.config.sharding?.shards) {
+      return this.config.sharding.shards[0].writeConfig;
+    }
+
+    return this.config.replication.write || this.config;
+
+  }
+
   async _initDatabaseVersion(conn?: TConnection) {
     if (this.sequelize.options.databaseVersion != null) {
       return;
@@ -254,6 +271,9 @@ export class AbstractConnectionManager<TConnection extends Connection = Connecti
 
     this.#versionPromise = (async () => {
       try {
+
+        // let's assume that all shards has the same db version so let's use the first shard
+
         const connection = conn ?? await this._connect(this.config.replication.write || this.config);
 
         const version = await this.sequelize.fetchDatabaseVersion({
@@ -288,7 +308,7 @@ export class AbstractConnectionManager<TConnection extends Connection = Connecti
    * @param connection
    */
   releaseConnection(connection: TConnection) {
-    this.pool.release(connection);
+    this.pool.release({ connection });
     debug('connection released');
   }
 
@@ -298,7 +318,7 @@ export class AbstractConnectionManager<TConnection extends Connection = Connecti
    * @param connection
    */
   async destroyConnection(connection: TConnection) {
-    await this.pool.destroy(connection);
+    await this.pool.destroy({ connection });
     debug(`connection ${connection.uuid} destroyed`);
   }
 
