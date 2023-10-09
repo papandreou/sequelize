@@ -171,7 +171,7 @@ export interface Config {
   readonly protocol: 'tcp';
   readonly native: boolean;
   readonly ssl: boolean;
-  readonly sharding: ShardOptions;
+  readonly sharding: ShardOptions | null;
   readonly replication: NormalizedReplicationOptions;
   readonly dialectModulePath: null | string;
   readonly keepDefaultTimezone?: boolean;
