@@ -9,7 +9,6 @@ import {
   ADD_COLUMN_QUERY_SUPPORTABLE_OPTIONS,
   CREATE_SCHEMA_QUERY_SUPPORTABLE_OPTIONS,
   CREATE_TABLE_QUERY_SUPPORTABLE_OPTIONS,
-  REMOVE_COLUMN_QUERY_SUPPORTABLE_OPTIONS,
 } from '../abstract/query-generator';
 import { Db2QueryGeneratorTypeScript } from './query-generator-typescript';
 
@@ -29,7 +28,6 @@ const { Op } = require('../../operators');
 
 const CREATE_SCHEMA_QUERY_SUPPORTED_OPTIONS = new Set();
 const ADD_COLUMN_QUERY_SUPPORTED_OPTIONS = new Set();
-const REMOVE_COLUMN_QUERY_SUPPORTED_OPTIONS = new Set();
 const CREATE_TABLE_QUERY_SUPPORTED_OPTIONS = new Set(['uniqueKeys']);
 
 /* istanbul ignore next */
@@ -183,15 +181,6 @@ export class Db2QueryGenerator extends Db2QueryGeneratorTypeScript {
     }
 
     return `${template(query, this._templateSettings)(values).trim()};${commentStr}`;
-  }
-
-  renameTableQuery(before, after) {
-    const query = 'RENAME TABLE <%= before %> TO <%= after %>;';
-
-    return template(query, this._templateSettings)({
-      before: this.quoteTable(before),
-      after: this.quoteTable(after),
-    });
   }
 
   addColumnQuery(table, key, dataType, options) {
