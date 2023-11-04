@@ -202,7 +202,7 @@ export class PostgresConnectionManager extends AbstractConnectionManager<PgConne
     connection.on('error', (error: any) => {
       connection._invalid = true;
       debug(`connection error ${error.code || error.message}`);
-      void this.pool.destroy(connection);
+      void this.pool.destroy({ connection });
     });
 
     let query = '';

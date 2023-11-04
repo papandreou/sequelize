@@ -150,6 +150,7 @@ export class Transaction {
       connection = await this.sequelize.connectionManager.getConnection({
         type: this.options.readOnly ? 'read' : 'write',
         uuid: this.id,
+        shardId: this.options.shardId,
       });
     }
 
@@ -529,6 +530,7 @@ export interface TransactionOptions extends Logging {
   isolationLevel?: IsolationLevel | null | undefined;
   type?: TransactionType | undefined;
   constraintChecking?: ConstraintChecking | Class<ConstraintChecking> | undefined;
+  shardId?: string | undefined;
 
   /**
    * Parent transaction.
@@ -539,6 +541,7 @@ export interface TransactionOptions extends Logging {
 
 export type NormalizedTransactionOptions = StrictRequiredBy<Omit<TransactionOptions, 'constraintChecking'>, 'type' | 'isolationLevel' | 'readOnly'> & {
   constraintChecking?: ConstraintChecking | undefined,
+  shardId?: string | undefined,
 };
 
 /**
@@ -563,6 +566,7 @@ export function normalizeTransactionOptions(
       : options.isolationLevel,
     readOnly: options.readOnly ?? false,
     constraintChecking: typeof options.constraintChecking === 'function' ? new options.constraintChecking() : options.constraintChecking,
+    shardId: options.shardId,
   };
 }
 

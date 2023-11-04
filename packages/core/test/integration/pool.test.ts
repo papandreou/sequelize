@@ -104,7 +104,7 @@ describe(getTestDialectTeaser('Pooling'), () => {
         }
 
         if (dialect === 'db2' || dialect === 'mariadb') {
-          await sequelize.connectionManager.pool.destroy(connection);
+          await sequelize.connectionManager.pool.destroy({ connection });
         } else {
           const error: NodeJS.ErrnoException = new Error('Test ECONNRESET Error');
           error.code = 'ECONNRESET';
