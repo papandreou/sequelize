@@ -271,10 +271,17 @@ export class AbstractConnectionManager<TConnection extends Connection = Connecti
 
     this.#versionPromise = (async () => {
       try {
+        let firstShardConfig;
+        const shardingConfig = this.config.sharding;
+        if (shardingConfig?.shards) {
+          // let's assume that all shards have the same db version so let's use the first shard
+          const firstShardId = Number.parseInt(Object.keys(shardingConfig.shards)[0], 10);
+          if (!Number.isNaN(firstShardId)) {
+            firstShardConfig = shardingConfig.shards[firstShardId]?.write;
+          }
+        }
 
-        // let's assume that all shards has the same db version so let's use the first shard
-
-        const connection = conn ?? await this._connect(this.config.replication.write || this.config);
+        const connection = conn ?? await this._connect(firstShardConfig || this.config.replication.write || this.config);
 
         const version = await this.sequelize.fetchDatabaseVersion({
           logging: false,
