@@ -48,6 +48,8 @@ export interface PgConnection extends Connection, Client {
   // Private property of pg-client
   // TODO: ask pg to expose a stable, readonly, property we can use
   _ending?: boolean;
+
+  oidMap?: Map<number, TypeOids>;
 }
 
 export class PostgresConnectionManager extends AbstractConnectionManager<PgConnection> {
@@ -338,7 +340,17 @@ export class PostgresConnectionManager extends AbstractConnectionManager<PgConne
     }
 
     // Replace all OID mappings. Avoids temporary empty OID mappings.
-    this.#oidMap = newNameOidMap;
+
+    if (!(connection instanceof Sequelize)) {
+      if (!connection.oidMap) {
+        connection.oidMap = newNameOidMap;
+      }
+
+      this.#oidMap = connection.oidMap;
+    } else {
+
+      this.#oidMap = newNameOidMap;
+    }
   }
 
   #buildArrayParser(subTypeParser: (value: string) => unknown): (source: string) => unknown[] {
