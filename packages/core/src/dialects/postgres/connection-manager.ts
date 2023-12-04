@@ -163,6 +163,10 @@ class CustomTypeParser {
     this.#arrayParserLib = arrayParserLib;
   }
 
+  get id(): string {
+    return this.#id;
+  }
+
   getTypeParser(oid: TypeId, format?: TypeFormat): TypeParser<any, any> {
 
     const cachedParser = this.#oidParserCache.get(oid);
