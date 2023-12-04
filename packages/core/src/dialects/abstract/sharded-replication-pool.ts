@@ -54,7 +54,11 @@ function shardValueToTuple(shardValue: ShardValue): [string, ConnectionType] {
   return [shardId, type as ConnectionType];
 }
 
-export class ShardedReplicationPool<Resource extends object> implements BaseReplicationPool<Resource> {
+interface ShardedObject extends Object {
+  shardId?: string | undefined;
+}
+
+export class ShardedReplicationPool<Resource extends ShardedObject> implements BaseReplicationPool<Resource> {
 
   readonly read: Map<string, Pool<Resource> | null> = new Map();
   readonly write: Map<string, Pool<Resource>> = new Map();
@@ -76,7 +80,9 @@ export class ShardedReplicationPool<Resource extends object> implements BaseRepl
           create: async () => {
             // round robin config
             const nextRead = reads++ % readConfig.length;
-            const connection = await connect(readConfig[nextRead]);
+            const connectionOptions = readConfig[nextRead];
+            connectionOptions.shardId = shardId;
+            const connection = await connect(connectionOptions);
 
             owningPools.set(connection, `read:${shardId}`);
 
@@ -99,6 +105,8 @@ export class ShardedReplicationPool<Resource extends object> implements BaseRepl
       const write = new Pool({
         name: 'sequelize:write',
         create: async () => {
+
+          writeConfig.shardId = shardId;
           const connection = await connect(writeConfig);
 
           owningPools.set(connection, `write:${shardId}`);
@@ -134,10 +142,19 @@ export class ShardedReplicationPool<Resource extends object> implements BaseRepl
     }
 
     if (type === 'read' && !useMaster) {
-      return pool.acquire();
+
+      const connection = await pool.acquire();
+
+      connection.shardId = shardId;
+
+      return connection;
+
     }
 
-    return pool.acquire();
+    const connection = await pool.acquire();
+    connection.shardId = shardId;
+
+    return connection;
 
   }
 
