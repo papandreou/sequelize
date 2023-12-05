@@ -131,8 +131,9 @@ export interface ConnectionOptions {
   protocol?: string;
   ssl?: boolean;
   dialectOptions?: DialectOptions;
-}
+  shardId?: string;
 
+}
 /**
  * Interface for replication Options in the sequelize constructor
  */

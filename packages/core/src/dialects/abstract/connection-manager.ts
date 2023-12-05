@@ -77,10 +77,14 @@ export class AbstractConnectionManager<TConnection extends Connection = Connecti
     if (config.sharding?.shards) {
 
       const shards = config.sharding.shards.map(shard => {
+
+        const readConfig = { shardId: shard.shardId, ...shard.read };
+        const writeConfig = { shardId: shard.shardId, ...shard.write };
+
         return {
           shardId: shard.shardId,
-          readConfig: shard.read,
-          writeConfig: shard.write,
+          readConfig,
+          writeConfig,
         };
       });
 
