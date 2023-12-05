@@ -48,6 +48,7 @@ export interface PgConnection extends Connection, Client {
   // Private property of pg-client
   // TODO: ask pg to expose a stable, readonly, property we can use
   _ending?: boolean;
+  shardId?: string | undefined;
 
 }
 
@@ -309,7 +310,6 @@ export class PostgresConnectionManager extends AbstractConnectionManager<PgConne
     };
 
     const connection: PgConnection = new this.lib.Client(connectionConfig);
-
     await new Promise((resolve, reject) => {
       let responded = false;
 
