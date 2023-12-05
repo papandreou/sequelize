@@ -49,8 +49,6 @@ export interface PgConnection extends Connection, Client {
   // TODO: ask pg to expose a stable, readonly, property we can use
   _ending?: boolean;
 
-  _typeParser?: CustomTypeParser;
-
 }
 
 function mapResultToTypeOids(rows: any[], oidMap: Map<number, TypeOids>): Map<number, TypeOids> {
@@ -153,6 +151,8 @@ class CustomTypeParser {
   readonly #dialect: PostgresDialect;
   readonly #arrayParserLib: ArrayParserLib;
 
+  private _invalid: boolean = false;
+
   constructor(dialect: PostgresDialect, lib: Lib, arrayParserLib: ArrayParserLib, id: string = 'default') {
 
     this.#id = id;
@@ -165,6 +165,14 @@ class CustomTypeParser {
 
   get id(): string {
     return this.#id;
+  }
+
+  get valid(): boolean {
+    return !this._invalid;
+  }
+
+  invalidate(): void {
+    this._invalid = true;
   }
 
   getTypeParser(oid: TypeId, format?: TypeFormat): TypeParser<any, any> {
@@ -231,7 +239,9 @@ export class PostgresConnectionManager extends AbstractConnectionManager<PgConne
   private readonly lib: Lib;
   readonly #arrayParserLib: ArrayParserLib;
 
-  readonly #defaultTypeParser: CustomTypeParser | undefined;
+  #defaultTypeParser: CustomTypeParser | undefined;
+
+  readonly #typeParserMap = new Map<string, CustomTypeParser>();
 
   constructor(dialect: PostgresDialect, sequelize: Sequelize) {
     super(dialect, sequelize);
@@ -246,8 +256,8 @@ export class PostgresConnectionManager extends AbstractConnectionManager<PgConne
   async connect(config: ConnectionOptions): Promise<PgConnection> {
     const port = Number(config.port ?? this.dialect.getDefaultPort());
 
-    const typeParser: CustomTypeParser
-    = new CustomTypeParser(this.dialect as PostgresDialect, this.lib, this.#arrayParserLib, config.shardId ?? undefined);
+    // load up the type parser so we can set the getTypeParser on the connection
+    const typeParser = this.#loadCustomTypeParser(config);
 
     // @ts-expect-error -- "dialectOptions.options" must be a string in PG, but a Record in MSSQL. We'll fix the typings when we split the dialects into their own modules.
     const connectionConfig: ClientConfig = {
@@ -423,10 +433,7 @@ export class PostgresConnectionManager extends AbstractConnectionManager<PgConne
       await connection.query(query);
     }
 
-    connection.shardId = config.shardId;
-    connection._typeParser = typeParser;
-
-    await connection._typeParser.refreshOidMap(connection);
+    await typeParser.refreshOidMap(connection);
 
     return connection;
   }
@@ -449,20 +456,59 @@ export class PostgresConnectionManager extends AbstractConnectionManager<PgConne
 
     const connection = await super.getConnection(options);
 
+    // if the type parser is invalid then refresh it
+    if (connection.shardId) {
+      const typeParser = this.#typeParserMap.get(connection.shardId);
+      if (typeParser && !typeParser.valid) {
+        await typeParser.refreshOidMap(connection);
+      }
+    } else if (this.#defaultTypeParser && !this.#defaultTypeParser.valid) {
+      await this.#defaultTypeParser.refreshOidMap(connection);
+    }
+
     return connection;
+  }
+
+  #loadCustomTypeParser(config: ConnectionOptions): CustomTypeParser {
+
+    let typeParser;
+
+    // if the sharding is enable then let's build the parser map with the shardId
+    // later any other mapping strategy can be used in any case in the future more customtypeparser is needed
+    if (config.shardId) {
+      typeParser = this.#typeParserMap.get(config.shardId);
+      if (!typeParser) {
+        typeParser = new CustomTypeParser(this.dialect as PostgresDialect, this.lib, this.#arrayParserLib, config.shardId);
+        this.#typeParserMap.set(config.shardId, typeParser);
+      }
+
+      return typeParser;
+    }
+
+    // falling back to having a default type parser for the whole connection manager shared with all connections
+
+    if (!this.#defaultTypeParser) {
+      this.#defaultTypeParser = new CustomTypeParser(this.dialect as PostgresDialect, this.lib, this.#arrayParserLib);
+    }
+
+    return this.#defaultTypeParser;
+
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async #refreshOidMap(connection: PgConnection | Sequelize): Promise<void> {
 
-    // no-op
-    // we need to invalidate caches for every connection
+    // we need to invalidate all the type parsers
+    // as the dynamic refresh might have been introduced some changes which can impact the oid mapping such as adding a new enum type
 
-    // const rawRows = await queryOids(connection);
+    for (const customtypeparser of this.#typeParserMap.values()) {
+      customtypeparser.invalidate();
+    }
 
-    // const newNameOidMap = new Map<number, TypeOids>();
-
-    // this.#oidMap = mapResultToTypeOids(rawRows, newNameOidMap);
+    // also invalidate the default type parser if exists
+    if (this.#defaultTypeParser) {
+      this.#defaultTypeParser.invalidate();
+    }
 
   }
 
