@@ -433,6 +433,8 @@ export class PostgresConnectionManager extends AbstractConnectionManager<PgConne
       await connection.query(query);
     }
 
+    connection.shardId = config.shardId || undefined;
+
     await typeParser.refreshOidMap(connection);
 
     return connection;
