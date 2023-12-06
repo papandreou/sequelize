@@ -78,7 +78,9 @@ export class AbstractConnectionManager<TConnection extends Connection = Connecti
 
       const shards = config.sharding.shards.map(shard => {
 
-        const readConfig = { shardId: shard.shardId, ...shard.read };
+        const readConfig = shard.read.map(replica => {
+          return { shardId: shard.shardId, ...replica };
+        });
         const writeConfig = { shardId: shard.shardId, ...shard.write };
 
         return {
