@@ -133,7 +133,7 @@ export class MsSqlConnectionManager extends AbstractConnectionManager<MsSqlConne
          */
         connection.on('error', (error: unknown) => {
           if (isErrorWithStringCode(error) && (error.code === 'ESOCKET' || error.code === 'ECONNRESET')) {
-            void this.pool.destroy(connection);
+            void this.pool.destroy({ connection });
           }
         });
 
