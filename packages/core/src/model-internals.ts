@@ -155,6 +155,13 @@ export function setTransactionFromCls(options: Transactionable, sequelize: Seque
 
   if (options.transaction === undefined && options.connection == null) {
     options.transaction = sequelize.getCurrentClsTransaction();
+
+    if ('shardId' in options && options.transaction?.shardId !== options?.shardId) {
+      // If the transaction is not on the same shard as the query, we don't want to recycle it
+      options.transaction = undefined;
+
+      return;
+    }
   }
 
   if (options.connection) {

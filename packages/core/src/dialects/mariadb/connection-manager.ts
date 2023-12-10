@@ -111,7 +111,7 @@ export class MariaDbConnectionManager extends AbstractConnectionManager<MariaDbC
           case 'ECONNRESET':
           case 'EPIPE':
           case 'PROTOCOL_CONNECTION_LOST':
-            void this.pool.destroy(connection);
+            void this.pool.destroy({ connection });
             break;
           default:
         }

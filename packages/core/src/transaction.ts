@@ -72,6 +72,10 @@ export class Transaction {
     return this.#connection;
   }
 
+  get shardId(): string | undefined {
+    return this.options.shardId;
+  }
+
   getConnectionIfExists(): Connection | undefined {
     return this.#connection;
   }
