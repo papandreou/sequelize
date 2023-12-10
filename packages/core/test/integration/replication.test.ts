@@ -1,4 +1,5 @@
 import { expect } from 'chai';
+import type { Pool } from 'sequelize-pool';
 import sinon from 'sinon';
 import { DataTypes } from '@sequelize/core';
 import {
@@ -42,8 +43,9 @@ describe(getTestDialectTeaser('Replication'), () => {
       });
 
       await User.sync({ force: true });
-      const readSpy = sandbox.spy(sequelize.connectionManager.pool.read!, 'acquire');
-      const writeSpy = sandbox.spy(sequelize.connectionManager.pool.write, 'acquire');
+
+      const readSpy = sandbox.spy(sequelize.connectionManager.pool.read! as Pool<object>, 'acquire');
+      const writeSpy = sandbox.spy(sequelize.connectionManager.pool.write as Pool<object>, 'acquire');
 
       return {
         User,
