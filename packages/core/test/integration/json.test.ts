@@ -1,8 +1,8 @@
+import { Attribute, BelongsTo } from '@sequelize/core/decorators-legacy';
 import { expect } from 'chai';
 import semver from 'semver';
 import type { CreationOptional, InferAttributes, InferCreationAttributes, NonAttribute } from '@sequelize/core';
 import { DataTypes, Model, Op, sql } from '@sequelize/core';
-import { Attribute, BelongsTo } from '@sequelize/core/decorators-legacy';
 import { beforeAll2, beforeEach2, inlineErrorCause, sequelize, setResetMode } from './support';
 
 const dialect = sequelize.dialect;
@@ -531,6 +531,6 @@ describe('JSONB Casting', () => {
       },
     })).to.be.rejected;
 
-    expect(inlineErrorCause(error)).to.include('Because JSON has two possible null values, comparing a JSON/JSONB attribute to NULL requires an explicit comparison operator. Use the `Op.is` operator to compare to SQL NULL, or the `Op.eq` operator to compare to JSON null.');
+    expect(inlineErrorCause(error)).to.include('You must be explicit');
   });
 });

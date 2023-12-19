@@ -1,8 +1,8 @@
 import assert from 'node:assert';
-import { expect } from 'chai';
-import { BelongsToMany as BelongsToManyAssociation, Model } from '@sequelize/core';
-import type { InferAttributes, NonAttribute } from '@sequelize/core';
 import { BelongsTo, BelongsToMany, HasMany, HasOne } from '@sequelize/core/decorators-legacy';
+import { expect } from 'chai';
+import { BelongsToManyAssociation, Model } from '@sequelize/core';
+import type { InferAttributes, NonAttribute } from '@sequelize/core';
 import { sequelize, typeTest } from '../../support';
 
 const CANNOT_INHERIT_ASSOCIATION_ERROR = /Models that use @HasOne, @HasMany, or @BelongsToMany associations cannot be inherited from/;
