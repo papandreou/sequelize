@@ -129,7 +129,7 @@ export class ShardedReplicationPool<Resource extends ShardedObject> implements B
 
   }
 
-  async acquire({ shardId, type = 'write', useMaster = false }: ShardedReplicationPoolAcquireOptions): Promise<Resource> {
+  async acquire({ shardId, type = 'write', useMaster }: ShardedReplicationPoolAcquireOptions): Promise<Resource> {
 
     if (type !== 'read' && type !== 'write') {
       throw new Error(`Expected queryType to be either read or write. Received ${type}`);
@@ -139,16 +139,6 @@ export class ShardedReplicationPool<Resource extends ShardedObject> implements B
 
     if (pool == null) {
       throw new Error(`No ${type} pool found for shard ${shardId}`);
-    }
-
-    if (type === 'read' && !useMaster) {
-
-      const connection = await pool.acquire();
-
-      connection.shardId = shardId;
-
-      return connection;
-
     }
 
     const connection = await pool.acquire();
@@ -213,7 +203,7 @@ export class ShardedReplicationPool<Resource extends ShardedObject> implements B
     debug('all connections destroyed');
   }
 
-  getPool({ shardId, poolType, useMaster = false }: ShardedReplicationPoolGetPoolOptions): Pool<Resource> | null {
+  getPool({ shardId, poolType, useMaster }: ShardedReplicationPoolGetPoolOptions): Pool<Resource> | null {
 
     if (poolType === 'read' && this.read != null && !useMaster) {
       return this.read.get(shardId) ?? null;
@@ -224,20 +214,20 @@ export class ShardedReplicationPool<Resource extends ShardedObject> implements B
 
   shardSize(shardId: string): number {
 
-    return this.getPool({ shardId, poolType: 'read', useMaster: false })?.size ?? 0 + (this.getPool({ shardId, poolType: 'write', useMaster: false })?.size ?? 0);
+    return this.getPool({ shardId, poolType: 'read', useMaster: false })?.size ?? 0 + (this.getPool({ shardId, poolType: 'write', useMaster: true })?.size ?? 0);
 
   }
 
   shardAvailable(shardId: string): number {
-    return this.getPool({ shardId, poolType: 'read', useMaster: false })?.available ?? 0 + (this.getPool({ shardId, poolType: 'write', useMaster: false })?.available ?? 0);
+    return this.getPool({ shardId, poolType: 'read', useMaster: false })?.available ?? 0 + (this.getPool({ shardId, poolType: 'write', useMaster: true })?.available ?? 0);
   }
 
   shardUsing(shardId: string): number {
-    return this.getPool({ shardId, poolType: 'read', useMaster: false })?.using ?? 0 + (this.getPool({ shardId, poolType: 'write', useMaster: false })?.using ?? 0);
+    return this.getPool({ shardId, poolType: 'read', useMaster: false })?.using ?? 0 + (this.getPool({ shardId, poolType: 'write', useMaster: true })?.using ?? 0);
   }
 
   shardWaiting(shardId: string): number {
-    return this.getPool({ shardId, poolType: 'read', useMaster: false })?.waiting ?? 0 + (this.getPool({ shardId, poolType: 'write', useMaster: false })?.waiting ?? 0);
+    return this.getPool({ shardId, poolType: 'read', useMaster: false })?.waiting ?? 0 + (this.getPool({ shardId, poolType: 'write', useMaster: true })?.waiting ?? 0);
   }
 
   get size(): number {
