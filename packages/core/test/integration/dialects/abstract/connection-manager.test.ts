@@ -64,6 +64,112 @@ describe(getTestDialectTeaser('Connection Manager'), () => {
     expect(sequelize.connectionManager.pool.write).to.be.instanceOf(Pool);
   });
 
+  it('initializes two shards with replication', async () => {
+
+    const options = {
+      sharding: {
+        shards: [
+          {
+            shardId: 'shard0',
+            write: { ...poolEntry, host: 'shard0' },
+            read: [{ ...poolEntry, host: 'shard0-replica0' }, { ...poolEntry, host: 'shard0-replica1' }],
+          },
+
+          {
+            shardId: 'shard1',
+            write: { ...poolEntry, host: 'shard1' },
+            read: [{ ...poolEntry, host: 'shard1-replica0' }, { ...poolEntry, host: 'shard1-replica1' }],
+          },
+
+        ],
+      },
+    };
+
+    const sequelize = createSingleTestSequelizeInstance(options);
+    const connectionManager = sequelize.connectionManager;
+
+    const res: Connection = {};
+
+    const connectStub = sandbox.stub(connectionManager, '_connect').resolves(res);
+    sandbox.stub(connectionManager, '_disconnect').resolves();
+    sandbox.stub(connectionManager, '_onProcessExit');
+    sandbox.stub(sequelize, 'fetchDatabaseVersion').resolves(sequelize.dialect.defaultVersion);
+
+    const queryOptions: GetConnectionOptions = {
+      type: 'read',
+      useMaster: false,
+      shardId: 'shard0',
+    };
+
+    const _getConnection = connectionManager.getConnection.bind(
+      connectionManager,
+      queryOptions,
+    );
+
+    await _getConnection();
+    await _getConnection();
+    await _getConnection();
+    chai.expect(connectStub.callCount).to.equal(4);
+
+    const calls = connectStub.getCalls();
+    chai.expect(calls[1].args[0].host).to.eql('shard0-replica0');
+    chai.expect(calls[2].args[0].host).to.eql('shard0-replica1');
+    chai.expect(calls[3].args[0].host).to.eql('shard0-replica0');
+
+    await sequelize.close();
+  });
+
+  it('uses the primary of the given shard', async () => {
+    const options = {
+      sharding: {
+        shards: [
+          {
+            shardId: 'shard0',
+            write: { ...poolEntry, host: 'shard0' },
+            read: [{ ...poolEntry, host: 'shard0-replica0' }, { ...poolEntry, host: 'shard0-replica1' }],
+          },
+
+          {
+            shardId: 'shard1',
+            write: { ...poolEntry, host: 'shard1' },
+            read: [{ ...poolEntry, host: 'shard1-replica0' }, { ...poolEntry, host: 'shard1-replica1' }],
+          },
+
+        ],
+      },
+    };
+
+    const sequelize = createSingleTestSequelizeInstance(options);
+    const connectionManager = sequelize.connectionManager;
+
+    const res: Connection = {};
+
+    const connectStub = sandbox.stub(connectionManager, '_connect').resolves(res);
+    sandbox.stub(connectionManager, '_disconnect').resolves();
+    sandbox.stub(connectionManager, '_onProcessExit');
+    sandbox.stub(sequelize, 'fetchDatabaseVersion').resolves(sequelize.dialect.defaultVersion);
+
+    const queryOptions: GetConnectionOptions = {
+      type: 'write',
+      useMaster: true,
+      shardId: 'shard0',
+    };
+
+    const _getConnection = connectionManager.getConnection.bind(
+      connectionManager,
+      queryOptions,
+    );
+
+    await _getConnection();
+
+    const calls = connectStub.getCalls();
+
+    chai.expect(calls[1].args[0].host).to.eql('shard0');
+
+    await sequelize.close();
+
+  });
+
   it('should round robin calls to the read pool', async () => {
     if (getTestDialect() === 'sqlite') {
       return;
