@@ -42,7 +42,7 @@ type ShardedReplicationPoolDestroyOptions<Resource> =
 ReplicationPoolDestroyOptions<Resource>;
 
 type ShardedReplicationPoolGetPoolOptions =
-ReplicationPoolGetPoolOptions & ShardIdentifier;
+ReplicationPoolGetPoolOptions & ShardIdentifier & { useMaster: boolean };
 
 const debug = logger.debugContext('pool');
 
@@ -135,7 +135,7 @@ export class ShardedReplicationPool<Resource extends ShardedObject> implements B
       throw new Error(`Expected queryType to be either read or write. Received ${type}`);
     }
 
-    const pool = this.getPool({ shardId, poolType: type });
+    const pool = this.getPool({ shardId, poolType: type, useMaster });
 
     if (pool == null) {
       throw new Error(`No ${type} pool found for shard ${shardId}`);
@@ -166,7 +166,7 @@ export class ShardedReplicationPool<Resource extends ShardedObject> implements B
 
     const [shardId, type] = shardValueToTuple(shardValue);
 
-    this.getPool({ shardId, poolType: type })?.release(connection);
+    this.getPool({ shardId, poolType: type, useMaster: false })?.release(connection);
 
   }
 
@@ -178,7 +178,7 @@ export class ShardedReplicationPool<Resource extends ShardedObject> implements B
 
     const [shardId, type] = shardValueToTuple(shardValue);
 
-    await this.getPool({ shardId, poolType: type })?.destroy(connection);
+    await this.getPool({ shardId, poolType: type, useMaster: false })?.destroy(connection);
     debug('connection destroy');
   }
 
@@ -213,9 +213,9 @@ export class ShardedReplicationPool<Resource extends ShardedObject> implements B
     debug('all connections destroyed');
   }
 
-  getPool({ shardId, poolType }: ShardedReplicationPoolGetPoolOptions): Pool<Resource> | null {
+  getPool({ shardId, poolType, useMaster = false }: ShardedReplicationPoolGetPoolOptions): Pool<Resource> | null {
 
-    if (poolType === 'read' && this.read != null) {
+    if (poolType === 'read' && this.read != null && !useMaster) {
       return this.read.get(shardId) ?? null;
     }
 
@@ -224,20 +224,20 @@ export class ShardedReplicationPool<Resource extends ShardedObject> implements B
 
   shardSize(shardId: string): number {
 
-    return this.getPool({ shardId, poolType: 'read' })?.size ?? 0 + (this.getPool({ shardId, poolType: 'write' })?.size ?? 0);
+    return this.getPool({ shardId, poolType: 'read', useMaster: false })?.size ?? 0 + (this.getPool({ shardId, poolType: 'write', useMaster: false })?.size ?? 0);
 
   }
 
   shardAvailable(shardId: string): number {
-    return this.getPool({ shardId, poolType: 'read' })?.available ?? 0 + (this.getPool({ shardId, poolType: 'write' })?.available ?? 0);
+    return this.getPool({ shardId, poolType: 'read', useMaster: false })?.available ?? 0 + (this.getPool({ shardId, poolType: 'write', useMaster: false })?.available ?? 0);
   }
 
   shardUsing(shardId: string): number {
-    return this.getPool({ shardId, poolType: 'read' })?.using ?? 0 + (this.getPool({ shardId, poolType: 'write' })?.using ?? 0);
+    return this.getPool({ shardId, poolType: 'read', useMaster: false })?.using ?? 0 + (this.getPool({ shardId, poolType: 'write', useMaster: false })?.using ?? 0);
   }
 
   shardWaiting(shardId: string): number {
-    return this.getPool({ shardId, poolType: 'read' })?.waiting ?? 0 + (this.getPool({ shardId, poolType: 'write' })?.waiting ?? 0);
+    return this.getPool({ shardId, poolType: 'read', useMaster: false })?.waiting ?? 0 + (this.getPool({ shardId, poolType: 'write', useMaster: false })?.waiting ?? 0);
   }
 
   get size(): number {
