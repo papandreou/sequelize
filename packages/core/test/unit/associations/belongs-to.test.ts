@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import each from 'lodash/each';
 import sinon from 'sinon';
-import type { CreationOptional, ModelStatic, NonAttribute } from '@sequelize/core';
+import {CreationOptional, ModelStatic, NonAttribute, Sequelize} from '@sequelize/core';
 import { DataTypes, Deferrable, Model } from '@sequelize/core';
 import { BelongsTo } from '@sequelize/core/decorators-legacy';
 import { getTestDialectTeaser, sequelize } from '../../support';
@@ -181,6 +181,7 @@ describe(getTestDialectTeaser('belongsTo'), () => {
 
         expect(beforeAssociateArgs[1].sequelize.constructor.name).to.equal('Sequelize');
       });
+
       it('should not trigger association hooks', () => {
         const beforeAssociate = sinon.spy();
         Projects.beforeAssociate(beforeAssociate);
@@ -218,5 +219,100 @@ describe(getTestDialectTeaser('belongsTo'), () => {
         expect(afterAssociate).to.not.have.been.called;
       });
     });
+  });
+
+  describe('composite foreign pk', () => {
+    let Projects: ModelStatic<any>;
+    let Tasks: ModelStatic<any>;
+    let Tenants: ModelStatic<any>;
+
+    beforeEach(() => {
+      Tenants = sequelize.define('tenant', {
+        tenantId: {
+          type: DataTypes.INTEGER,
+          primaryKey: true,
+        },
+      });
+
+      Projects = sequelize.define('project', {
+        projectId: {
+          type: DataTypes.INTEGER,
+          primaryKey: true,
+        },
+        name: DataTypes.STRING,
+      });
+      Projects.belongsTo(Tenants, { foreignKey: 'tenantId' });
+
+      Tasks = sequelize.define('task', {
+        taskId: {
+          type: DataTypes.INTEGER,
+          primaryKey: true,
+        },
+        name: DataTypes.STRING,
+      });
+    });
+
+    describe('association hooks', () => {
+
+      describe('beforeAssociate', () => {
+        it('should trigger', () => {
+          const beforeAssociate = sinon.spy();
+
+
+          Tasks.beforeAssociate(beforeAssociate);
+          Tasks.belongsTo(Projects, { foreignKeys: ['projectId', 'tenantId'], hooks: true });
+
+          const beforeAssociateArgs = beforeAssociate.getCall(0).args;
+
+          expect(beforeAssociate).to.have.been.called;
+          expect(beforeAssociateArgs.length).to.equal(2);
+
+          const firstArg = beforeAssociateArgs[0];
+          expect(Object.keys(firstArg).join(',')).to.equal('source,target,type,sequelize');
+          expect(firstArg.source).to.equal(Projects);
+          expect(firstArg.target).to.equal(Tasks);
+          expect(firstArg.type.name).to.equal('BelongsTo');
+
+          expect(beforeAssociateArgs[1].sequelize.constructor.name).to.equal('Sequelize');
+        });
+        // it('should not trigger association hooks', () => {
+        //   const beforeAssociate = sinon.spy();
+        //   Projects.beforeAssociate(beforeAssociate);
+        //   Projects.belongsTo(Tasks, { hooks: false });
+        //   expect(beforeAssociate).to.not.have.been.called;
+        // });
+      });
+
+      // describe('afterAssociate', () => {
+      //   it('should trigger', () => {
+      //     const afterAssociate = sinon.spy();
+      //     Projects.afterAssociate(afterAssociate);
+      //     Projects.belongsTo(Tasks, { hooks: true });
+      //
+      //     const afterAssociateArgs = afterAssociate.getCall(0).args;
+      //
+      //     expect(afterAssociate).to.have.been.called;
+      //     expect(afterAssociateArgs.length).to.equal(2);
+      //
+      //     const firstArg = afterAssociateArgs[0];
+      //
+      //     expect(Object.keys(firstArg).join(',')).to.equal('source,target,type,association,sequelize');
+      //     expect(firstArg.source).to.equal(Projects);
+      //     expect(firstArg.target).to.equal(Tasks);
+      //     expect(firstArg.type.name).to.equal('BelongsTo');
+      //     expect(firstArg.association.constructor.name).to.equal('BelongsTo');
+      //
+      //     expect(afterAssociateArgs[1].sequelize.constructor.name).to.equal('Sequelize');
+      //   });
+      //
+      //   it('should not trigger association hooks', () => {
+      //     const afterAssociate = sinon.spy();
+      //     Projects.afterAssociate(afterAssociate);
+      //     Projects.belongsTo(Tasks, { hooks: false });
+      //     expect(afterAssociate).to.not.have.been.called;
+      //   });
+      // });
+    });
+
   });
 });
