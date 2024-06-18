@@ -222,9 +222,9 @@ describe(getTestDialectTeaser('belongsTo'), () => {
   });
 
   describe('composite foreign pk', () => {
+    let Tenants: ModelStatic<any>;
     let Projects: ModelStatic<any>;
     let Tasks: ModelStatic<any>;
-    let Tenants: ModelStatic<any>;
 
     beforeEach(() => {
       Tenants = sequelize.define('tenant', {
@@ -236,6 +236,10 @@ describe(getTestDialectTeaser('belongsTo'), () => {
 
       Projects = sequelize.define('project', {
         projectId: {
+          type: DataTypes.INTEGER,
+          primaryKey: true,
+        },
+        tenantId: {
           type: DataTypes.INTEGER,
           primaryKey: true,
         },
@@ -255,9 +259,8 @@ describe(getTestDialectTeaser('belongsTo'), () => {
     describe('association hooks', () => {
 
       describe('beforeAssociate', () => {
-        it('should trigger', () => {
+        it.only('should triggerzzzzzzzzzzz test test', () => {
           const beforeAssociate = sinon.spy();
-
 
           Tasks.beforeAssociate(beforeAssociate);
           Tasks.belongsTo(Projects, { foreignKeys: ['projectId', 'tenantId'], hooks: true });

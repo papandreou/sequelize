@@ -100,6 +100,9 @@ export abstract class Association<
 
   abstract foreignKey: ForeignKey;
 
+  // TODO: uncomment when finishing implementing foreignKeys for all associations
+  // abstract foreignKeys: ForeignKey[];
+
   /**
    * A reference to the association that created this one.
    */
@@ -308,6 +311,15 @@ export interface AssociationOptions<ForeignKey extends string = string> extends 
    * with the {@link ForeignKeyOptions.name} option set.
    */
   foreignKey?: ForeignKey | ForeignKeyOptions<ForeignKey>;
+
+  /**
+   * The configuration of the foreign keys Attribute. See {@link Sequelize#define}
+   * or {@link Model.init} for more information about the syntax.
+   *
+   * Using a string array is equivalent to passing a {@link ForeignKeyOptions} object
+   * with the {@link ForeignKeyOptions.name} option set.
+   */
+  foreignKeys?: ForeignKey[] | Array<ForeignKeyOptions<ForeignKey>>;
 
   /**
    * Should ON UPDATE, ON DELETE, and REFERENCES constraints be enabled on the foreign key.

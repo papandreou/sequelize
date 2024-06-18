@@ -10,7 +10,7 @@ import type {
   Attributes,
   CreateOptions,
   CreationAttributes,
-  FindOptions,
+  FindOptions, ForeignKey,
   Model,
   ModelStatic,
   SaveOptions,
@@ -61,6 +61,8 @@ export class BelongsTo<
 
   foreignKey: SourceKey;
 
+  foreignKeys: SourceKey[];
+
   /**
    * The column name of the foreign key
    */
@@ -73,6 +75,13 @@ export class BelongsTo<
    * The {@link Association.foreignKey} is on the Source Model.
    */
   targetKey: TargetKey;
+
+  /**
+   * The name of the attributes the foreign key points to.
+   * In belongsTo, this key is on the Target Model, instead of the Source Model  (unlike {@link HasOne.sourceKey}).
+   * The {@link Association.foreignKey} is on the Source Model.
+   */
+  targetKeys: TargetKey[];
 
   /**
    * The column name of the target key
@@ -98,13 +107,16 @@ export class BelongsTo<
     options: NormalizedBelongsToOptions<SourceKey, TargetKey>,
     parent?: Association,
   ) {
-    // TODO: throw is source model has a composite primary key.
-    const targetKey = options?.targetKey || (target.primaryKeyAttribute as TargetKey);
+    const targetKeys = options?.targetKey
+      ? [options.targetKey]
+      : target.modelDefinition.primaryKeysAttributeNames;
 
     const targetAttributes = target.modelDefinition.attributes;
 
-    if (!targetAttributes.has(targetKey)) {
-      throw new Error(`Unknown attribute "${options.targetKey}" passed as targetKey, define this attribute on model "${target.name}" first`);
+    for (const key of targetKeys) {
+      if (!targetAttributes.has(key)) {
+        throw new Error(`Unknown attribute "${key}" passed as targetKey, define this attribute on model "${target.name}" first`);
+      }
     }
 
     if ('keyType' in options) {
@@ -113,7 +125,10 @@ export class BelongsTo<
 
     super(secret, source, target, options, parent);
 
-    this.targetKey = targetKey;
+    // TODO remove when composite pk is finished
+    const [ targetKey ] = targetKeys;
+    this.targetKey = targetKey as TargetKey;
+    this.targetKeys = targetKeys as TargetKey[];
 
     // For Db2 server, a reference column of a FOREIGN KEY must be unique
     // else, server throws SQL0573N error. Hence, setting it here explicitly
@@ -140,6 +155,7 @@ export class BelongsTo<
     }
 
     this.foreignKey = foreignKey as SourceKey;
+    this.foreignKeys = [this.foreignKey] as SourceKey[];
 
     this.targetKeyField = getColumnName(targetAttributes.get(this.targetKey)!);
     this.targetKeyIsPrimary = this.targetKey === this.target.primaryKeyAttribute;
