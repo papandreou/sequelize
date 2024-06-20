@@ -241,6 +241,7 @@ export type NormalizeBaseAssociationOptions<T> = Omit<T, 'as' | 'hooks' | 'forei
   name: { singular: string, plural: string },
   hooks: boolean,
   foreignKey: ForeignKeyOptions<any>,
+  // foreignKeys: Array<{ source: string, target: string }>,
 };
 
 export function normalizeInverseAssociation<T extends { as?: unknown }>(
@@ -297,6 +298,7 @@ export function normalizeBaseAssociationOptions<T extends AssociationOptions<any
   return removeUndefined({
     ...options,
     foreignKey: normalizeForeignKeyOptions(options.foreignKey),
+    foreignKeys: normalizeCompositeForeignKeyOptions(options.foreignKeys),
     hooks: options.hooks ?? false,
     as,
     name,
@@ -306,8 +308,20 @@ export function normalizeBaseAssociationOptions<T extends AssociationOptions<any
 export function normalizeForeignKeyOptions<T extends string>(foreignKey: AssociationOptions<T>['foreignKey']): ForeignKeyOptions<any> {
   return typeof foreignKey === 'string' ? { name: foreignKey } : removeUndefined({
     ...foreignKey,
-    name: foreignKey?.name ?? foreignKey?.fieldName,
+    name: foreignKey?.name ?? foreignKey?.columnName,
     fieldName: undefined,
+  });
+}
+
+export function normalizeCompositeForeignKeyOptions<T extends string>(foreignKeys: AssociationOptions<T>['foreignKeys']): Array<{ source: string, target: string }> {
+  if (!Array.isArray(foreignKeys)) {
+    return [];
+  }
+
+  return foreignKeys.map(foreignKey => {
+    return typeof foreignKey === 'string' ? { source: foreignKey, target: foreignKey } : removeUndefined({
+      ...foreignKey,
+    });
   });
 }
 

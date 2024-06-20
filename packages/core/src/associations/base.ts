@@ -100,9 +100,6 @@ export abstract class Association<
 
   abstract foreignKey: ForeignKey;
 
-  // TODO: uncomment when finishing implementing foreignKeys for all associations
-  // abstract foreignKeys: ForeignKey[];
-
   /**
    * A reference to the association that created this one.
    */
@@ -290,6 +287,12 @@ export interface ForeignKeyOptions<ForeignKey extends string> extends PartialBy<
 export type NormalizedAssociationOptions<ForeignKey extends string>
   = NormalizeBaseAssociationOptions<AssociationOptions<ForeignKey>>;
 
+/** Foreign Key Options */
+export interface CompositeForeignKeysOptions {
+  source: string;
+  target: string;
+}
+
 /**
  * Options provided when associating models
  */
@@ -319,7 +322,7 @@ export interface AssociationOptions<ForeignKey extends string = string> extends 
    * Using a string array is equivalent to passing a {@link ForeignKeyOptions} object
    * with the {@link ForeignKeyOptions.name} option set.
    */
-  foreignKeys?: ForeignKey[] | Array<ForeignKeyOptions<ForeignKey>>;
+  foreignKeys?: string[] | Array<{ source: string, target: string }>;
 
   /**
    * Should ON UPDATE, ON DELETE, and REFERENCES constraints be enabled on the foreign key.
