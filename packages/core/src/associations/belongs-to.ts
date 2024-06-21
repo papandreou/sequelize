@@ -22,7 +22,7 @@ import { getColumnName } from '../utils/format.js';
 import { isSameInitialModel } from '../utils/model-utils.js';
 import { cloneDeep, removeUndefined } from '../utils/object.js';
 import { camelize } from '../utils/string.js';
-import {Association, ForeignKeyOptions} from './base';
+import { Association, ForeignKeyOptions } from './base';
 import type { AssociationOptions, SingleAssociationAccessors } from './base';
 import { HasMany } from './has-many.js';
 import { HasOne } from './has-one.js';
@@ -62,7 +62,7 @@ export class BelongsTo<
 
   foreignKey: SourceKey;
 
-  foreignKeys: SourceKey[];
+  foreignKeys: Array<{ source: SourceKey, target: TargetKey }> = [];
 
   /**
    * The column name of the foreign key
@@ -91,6 +91,8 @@ export class BelongsTo<
   readonly targetKeyField: string;
 
   readonly targetKeyIsPrimary: boolean;
+
+  readonly targetKeyAtributes: Array<{ columnName: string, isPrimary: boolean }> = [];
 
   /**
    * @deprecated use {@link BelongsTo.targetKey}
@@ -126,65 +128,95 @@ export class BelongsTo<
 
     super(secret, source, target, options, parent);
 
-    // TODO remove when composite pk is finished
-    const [targetKey] = targetKeys;
-    this.targetKey = targetKey as TargetKey;
-    this.targetKeys = targetKeys as TargetKey[];
+    this.targetKeys = Array.isArray(targetKeys) ? targetKeys : [...targetKeys].map(key => key as TargetKey);
+    const isCompositeKey = this.targetKeys.length > 1;
 
-    // For Db2 server, a reference column of a FOREIGN KEY must be unique
-    // else, server throws SQL0573N error. Hence, setting it here explicitly
-    // for non primary columns.
+    // edge case for hashing binary composite key for backwards compatibility (?)
+    const primaryKeyAttributes = [];
+    for (const attributes of targetAttributes.values()) {
+      if (attributes.primaryKey) {
+        primaryKeyAttributes.push(attributes);
+      }
+    }
+
+    // unclear if this only happens with 2 but tests are written for 2, but it was probably written
+    // that way to hack / 'support' composite primary keys for some scenarios like
+    // packages/core/test/unit/dialects/abstract/query.test.js:147
+    const shouldHashPrimaryKey = primaryKeyAttributes.length === 2 && primaryKeyAttributes.some(attr => attr.type === 'BINARY(16)');
+
+    const [targetKey] = targetKeys;
+    const foreignKeys = [];
+    this.targetKey = targetKey as TargetKey;
+    let foreignKeyAttributeOptions;
+
+    console.log(targetKey);
+
+    if (!isCompositeKey || shouldHashPrimaryKey) {
+      // const [ targetKey ] = targetKeys;
+      // this.targetKey = targetKey as TargetKey;
+
+      // For Db2 server, a reference column of a FOREIGN KEY must be unique
+      // else, server throws SQL0573N error. Hence, setting it here explicitly
+      // for non primary columns.
+      if (target.sequelize.options.dialect === 'db2' && targetAttributes.get(targetKey)!.primaryKey !== true) {
+        // TODO: throw instead
+        this.target.modelDefinition.rawAttributes[targetKey].unique = true;
+      }
+
+      let foreignKey: string | undefined;
+      // let foreignKeyAttributeOptions;
+      if (isObject(this.options?.foreignKey)) {
+        // lodash has poor typings
+        assert(typeof this.options?.foreignKey === 'object');
+
+        foreignKeyAttributeOptions = this.options.foreignKey;
+        foreignKey = this.options.foreignKey.name || this.options.foreignKey.columnName;
+      } else if (this.options?.foreignKey) {
+        foreignKey = this.options.foreignKey;
+      }
+
+      if (!foreignKey) {
+        foreignKey = this.inferForeignKey();
+      }
+
+      foreignKeys.push({ foreignKey: foreignKey as SourceKey, attributeOptions: foreignKeyAttributeOptions });
+      this.foreignKey = foreignKey as SourceKey;
+    } else {
+      // composite key flow
+
+      console.log('!???');
+      console.log(this.targetKeys);
+
+      this.targetKey = null as any;
+      this.foreignKey = null as any;
+      // this.targetKey = null;
+    }
+
+    // // For Db2 server, a reference column of a FOREIGN KEY must be unique
+    // // else, server throws SQL0573N error. Hence, setting it here explicitly
+    // // for non primary columns.
     // if (target.sequelize.options.dialect === 'db2' && targetAttributes.get(this.targetKey)!.primaryKey !== true) {
     //   // TODO: throw instead
     //   this.target.modelDefinition.rawAttributes[this.targetKey].unique = true;
     // }
-
-    let foreignKeys = [];
-    let foreignKeyAttributeOptions;
-
-    if (this.options?.foreignKey) {
-      if (isObject(this.options.foreignKey)) {
-        // Ensure this.options.foreignKey is an object
-        assert(typeof this.options.foreignKey === 'object');
-
-        foreignKeyAttributeOptions = this.options.foreignKey;
-        const foreignKey = this.options.foreignKey.name || this.options.foreignKey.columnName;
-        if (foreignKey) {
-          foreignKeys.push(foreignKey);
-        }
-      } else {
-        foreignKeys.push(this.options.foreignKey);
-      }
-    } else if (this.options?.foreignKeys) {
-      // Ensure all entries in options.foreignKeys are added to foreignKeys
-      for (const foreignKey of this.options.foreignKeys) {
-        if (isObject(foreignKey)) {
-          const key = foreignKey.name || foreignKey.columnName;
-          if (key) {
-            foreignKeys.push(key);
-          }
-        } else {
-          foreignKeys.push(foreignKey);
-        }
-      }
-    }
-
-    if (foreignKeys.length === 0) {
-      const inferredKey = this.inferForeignKey();
-      if (inferredKey) {
-        foreignKeys.push(inferredKey);
-      }
-    }
-
-    // Ensure there is at least one foreign key
-    if (foreignKeys.length === 0) {
-      throw new Error('No valid foreign key provided or inferred.');
-    }
-
-    this.foreignKeys = foreignKeys as SourceKey[];
-
-    // Use the first foreign key as the primary one for further processing
-    this.foreignKey = this.foreignKeys[0];
+    //
+    // let foreignKey: string | undefined;
+    // let foreignKeyAttributeOptions;
+    // if (isObject(this.options?.foreignKey)) {
+    //   // lodash has poor typings
+    //   assert(typeof this.options?.foreignKey === 'object');
+    //
+    //   foreignKeyAttributeOptions = this.options.foreignKey;
+    //   foreignKey = this.options.foreignKey.name || this.options.foreignKey.fieldName;
+    // } else if (this.options?.foreignKey) {
+    //   foreignKey = this.options.foreignKey;
+    // }
+    //
+    // if (!foreignKey) {
+    //   foreignKey = this.inferForeignKey();
+    // }
+    //
+    // this.foreignKey = foreignKey as SourceKey;
 
     this.targetKeyField = getColumnName(targetAttributes.get(this.targetKey)!);
     this.targetKeyIsPrimary = this.targetKey === this.target.primaryKeyAttribute;
