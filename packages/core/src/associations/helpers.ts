@@ -1,5 +1,7 @@
 import assert from 'node:assert';
 import NodeUtils from 'node:util';
+import isEmpty from 'lodash/isEmpty';
+import some from 'lodash/some';
 import isEqual from 'lodash/isEqual';
 import isPlainObject from 'lodash/isPlainObject.js';
 import lowerFirst from 'lodash/lowerFirst';
@@ -271,6 +273,13 @@ export function normalizeBaseAssociationOptions<T extends AssociationOptions<any
 
   if ('foreignKeyConstraint' in options) {
     throw new Error('Option "foreignKeyConstraint" has been renamed to "foreignKeyConstraints" (with a "s" at the end)');
+  }
+
+  // make sure both are not used at the same time
+  if (some(options.foreignKey, isEmpty) && some(options.foreignKeys, isEmpty)) {
+    throw new Error(
+      'Only one of "foreignKey" and "foreignKeys" can be defined',
+    );
   }
 
   const isMultiAssociation = associationType.isMultiAssociation;
