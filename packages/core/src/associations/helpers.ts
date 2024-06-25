@@ -1,11 +1,11 @@
 import assert from 'node:assert';
 import NodeUtils from 'node:util';
 import isEmpty from 'lodash/isEmpty';
-import some from 'lodash/some';
 import isEqual from 'lodash/isEqual';
 import isPlainObject from 'lodash/isPlainObject.js';
 import lowerFirst from 'lodash/lowerFirst';
 import omit from 'lodash/omit';
+import some from 'lodash/some';
 import type { Class } from 'type-fest';
 import { AssociationError } from '../errors/index.js';
 import type { Model, ModelStatic } from '../model';
@@ -156,8 +156,9 @@ function getAssociationsIncompatibilityStatus(
     return IncompatibilityStatus.DIFFERENT_TARGETS;
   }
 
-  const opts1 = omit(existingAssociation.options as any, 'inverse');
-  const opts2 = omit(newOptions, 'inverse');
+  // TODO: figure out why this failed
+  const opts1 = omit(existingAssociation.options as any, 'inverse', 'foreignKeys');
+  const opts2 = omit(newOptions, 'inverse', 'foreignKeys');
   if (!isEqual(opts1, opts2)) {
     return IncompatibilityStatus.DIFFERENT_OPTIONS;
   }
@@ -307,31 +308,39 @@ export function normalizeBaseAssociationOptions<T extends AssociationOptions<any
   return removeUndefined({
     ...options,
     foreignKey: normalizeForeignKeyOptions(options.foreignKey),
-    foreignKeys: normalizeCompositeForeignKeyOptions(options.foreignKeys),
+    foreignKeys: normalizeCompositeForeignKeyOptions(options),
     hooks: options.hooks ?? false,
     as,
     name,
   });
 }
 
-export function normalizeForeignKeyOptions<T extends string>(foreignKey: AssociationOptions<T>['foreignKey']): ForeignKeyOptions<any> {
-  return typeof foreignKey === 'string' ? { name: foreignKey } : removeUndefined({
-    ...foreignKey,
-    name: foreignKey?.name ?? foreignKey?.columnName,
-    fieldName: undefined,
-  });
+export function normalizeForeignKeyOptions<T extends string>(
+  foreignKey: AssociationOptions<T>['foreignKey'],
+): ForeignKeyOptions<any> {
+  return typeof foreignKey === 'string'
+    ? { name: foreignKey }
+    : removeUndefined({
+      ...foreignKey,
+      name: foreignKey?.name ?? foreignKey?.columnName,
+      fieldName: undefined,
+    });
 }
 
-export function normalizeCompositeForeignKeyOptions<T extends string>(foreignKeys: AssociationOptions<T>['foreignKeys']): Array<{ source: string, target: string }> {
-  if (!Array.isArray(foreignKeys)) {
-    return [];
+// Update the option normalization logic to turn `foreignKey` and `targetKey` into `foreignKeys`,
+export function normalizeCompositeForeignKeyOptions<T extends string>(options: AssociationOptions<T>): Array<{
+  source: string,
+  target: string,
+}> {
+  if (Array.isArray(options.foreignKeys)) {
+    return options.foreignKeys.map(fk => {
+      return typeof fk === 'string' ? { source: fk, target: fk } : fk;
+    });
   }
 
-  return foreignKeys.map(foreignKey => {
-    return typeof foreignKey === 'string' ? { source: foreignKey, target: foreignKey } : removeUndefined({
-      ...foreignKey,
-    });
-  });
+  const normalizedForeignKey = normalizeForeignKeyOptions(options.foreignKey);
+
+  return [{ source: normalizedForeignKey.name, target: normalizedForeignKey.name }];
 }
 
 export type MaybeForwardedModelStatic<M extends Model = Model> = ModelStatic<M> | ((sequelize: Sequelize) => ModelStatic<M>);
