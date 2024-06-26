@@ -6,7 +6,7 @@ import { DataTypes, Deferrable, Model } from '@sequelize/core';
 import { BelongsTo } from '@sequelize/core/decorators-legacy';
 import { getTestDialectTeaser, sequelize } from '../../support';
 
-describe.only(getTestDialectTeaser('belongsTo'), () => {
+describe(getTestDialectTeaser('belongsTo'), () => {
   it('throws when invalid model is passed', () => {
     const User = sequelize.define('User');
 

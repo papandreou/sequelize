@@ -2,10 +2,10 @@ import assert from 'node:assert';
 import isEmpty from 'lodash/isEmpty.js';
 import isEqual from 'lodash/isEqual';
 import isObject from 'lodash/isObject.js';
-import some from 'lodash/some';
+import some from 'lodash/some.js';
 import upperFirst from 'lodash/upperFirst';
 import { cloneDataType } from '../dialects/abstract/data-types-utils.js';
-import { AssociationError } from '../errors/index.js';
+import { AssociationError } from '../errors';
 import type {
   AttributeNames,
   AttributeReferencesOptions,
@@ -15,20 +15,22 @@ import type {
   FindOptions,
   Model,
   ModelStatic,
-  SaveOptions
+  NormalizedAttributeOptions,
+  SaveOptions,
 } from '../model';
 import { normalizeReference } from '../model-definition.js';
 import { Op } from '../operators';
 import { getColumnName } from '../utils/format.js';
+import type { MapView } from '../utils/immutability';
 import { isSameInitialModel } from '../utils/model-utils.js';
 import { cloneDeep, removeUndefined } from '../utils/object.js';
 import { camelize } from '../utils/string.js';
-import type { AssociationOptions, SingleAssociationAccessors } from './base';
 import { Association } from './base';
+import type { AssociationOptions, SingleAssociationAccessors } from './base';
 import { HasMany } from './has-many.js';
 import { HasOne } from './has-one.js';
-import type { NormalizeBaseAssociationOptions } from './helpers';
 import { defineAssociation, mixinMethods, normalizeBaseAssociationOptions } from './helpers';
+import type { NormalizeBaseAssociationOptions } from './helpers';
 
 /**
  * One-to-one association
@@ -78,12 +80,7 @@ export class BelongsTo<
    */
   targetKey: TargetKey;
 
-  /**
-   * The name of the attributes the foreign key points to.
-   * In belongsTo, this key is on the Target Model, instead of the Source Model  (unlike {@link HasOne.sourceKey}).
-   * The {@link Association.foreignKey} is on the Source Model.
-   */
-  targetKeys: TargetKey[];
+  targetKeys: TargetKey[] = [];
 
   /**
    * The column name of the target key
@@ -92,8 +89,6 @@ export class BelongsTo<
   readonly targetKeyField: string;
 
   readonly targetKeyIsPrimary: boolean;
-
-  readonly targetKeyAtributes: Array<{ columnName: string, isPrimary: boolean }> = [];
 
   /**
    * @deprecated use {@link BelongsTo.targetKey}
@@ -111,8 +106,14 @@ export class BelongsTo<
     options: NormalizedBelongsToOptions<SourceKey, TargetKey>,
     parent?: Association,
   ) {
-    const targetKeys = !(some(options.foreignKeys, isEmpty))
-      ? options.foreignKeys?.map(fk => (fk as { target: string }).target) as TargetKey[]
+
+    // TODO: technically correct, but has some bugs, so must combine two approaches
+    // const targetKeys = !(some(options.foreignKeys, isEmpty))
+    //   ? options.foreignKeys?.map(fk => (fk as { target: string }).target) as TargetKey[]
+    //   : target.modelDefinition.primaryKeysAttributeNames;
+
+    const targetKeys = options?.targetKey
+      ? [options.targetKey]
       : target.modelDefinition.primaryKeysAttributeNames;
 
     const targetAttributes = target.modelDefinition.attributes;
@@ -129,50 +130,31 @@ export class BelongsTo<
 
     super(secret, source, target, options, parent);
 
-    this.targetKeys = targetKeys as TargetKey[];
+    this.targetKeys = Array.isArray(targetKeys) ? targetKeys : [...targetKeys].map(key => key as TargetKey);
 
     const isCompositeKey = this.targetKeys.length > 1;
-
-    // edge case for hashing binary composite key for backwards compatibility (?)
-    const primaryKeyAttributes = [];
-    for (const attributes of targetAttributes.values()) {
-      if (attributes.primaryKey) {
-        primaryKeyAttributes.push(attributes);
-      }
-    }
-
-    // unclear if this only happens with 2 but tests are written for 2, but it was probably written
-    // that way to hack / 'support' composite primary keys for some scenarios like
-    // packages/core/test/unit/dialects/abstract/query.test.js:147
-    const shouldHashPrimaryKey = primaryKeyAttributes.length === 2 && primaryKeyAttributes.some(attr => attr.type === 'BINARY(16)');
-
-    const [targetKey] = targetKeys;
-    const foreignKeys = [];
-    this.targetKey = targetKey as TargetKey;
-    let foreignKeyAttributeOptions;
-
-    console.log('isCompositeKey', isCompositeKey);
+    const shouldHashPrimaryKey = this.shouldHashPrimaryKey(targetAttributes);
 
     if (!isCompositeKey || shouldHashPrimaryKey) {
-      // const [ targetKey ] = targetKeys;
-      // this.targetKey = targetKey as TargetKey;
+      const [targetKey] = this.targetKeys;
+      this.targetKey = targetKey;
 
       // For Db2 server, a reference column of a FOREIGN KEY must be unique
       // else, server throws SQL0573N error. Hence, setting it here explicitly
       // for non primary columns.
-      if (target.sequelize.options.dialect === 'db2' && targetAttributes.get(targetKey)!.primaryKey !== true) {
+      if (target.sequelize.options.dialect === 'db2' && targetAttributes.get(this.targetKey)!.primaryKey !== true) {
         // TODO: throw instead
-        this.target.modelDefinition.rawAttributes[targetKey].unique = true;
+        this.target.modelDefinition.rawAttributes[this.targetKey].unique = true;
       }
 
       let foreignKey: string | undefined;
-      // let foreignKeyAttributeOptions;
+      let foreignKeyAttributeOptions;
       if (isObject(this.options?.foreignKey)) {
         // lodash has poor typings
         assert(typeof this.options?.foreignKey === 'object');
 
         foreignKeyAttributeOptions = this.options.foreignKey;
-        foreignKey = this.options.foreignKey.name || this.options.foreignKey.columnName;
+        foreignKey = this.options.foreignKey.name || this.options.foreignKey.fieldName;
       } else if (this.options?.foreignKey) {
         foreignKey = this.options.foreignKey;
       }
@@ -181,10 +163,69 @@ export class BelongsTo<
         foreignKey = this.inferForeignKey();
       }
 
-      foreignKeys.push({ foreignKey: foreignKey as SourceKey });
       this.foreignKey = foreignKey as SourceKey;
+
+      this.targetKeyField = getColumnName(targetAttributes.get(this.targetKey)!);
+      this.targetKeyIsPrimary = this.targetKey === this.target.primaryKeyAttribute;
+
+      const targetAttribute = targetAttributes.get(this.targetKey)!;
+
+      const existingForeignKey = source.modelDefinition.rawAttributes[this.foreignKey];
+      const newForeignKeyAttribute = removeUndefined({
+        type: cloneDataType(targetAttribute.type),
+        ...foreignKeyAttributeOptions,
+        allowNull: existingForeignKey?.allowNull ?? foreignKeyAttributeOptions?.allowNull,
+      });
+
+      // FK constraints are opt-in: users must either set `foreignKeyConstraints`
+      // on the association, or request an `onDelete` or `onUpdate` behavior
+      if (options.foreignKeyConstraints !== false) {
+        const existingReference = existingForeignKey?.references
+          ? (normalizeReference(existingForeignKey.references) ?? existingForeignKey.references) as AttributeReferencesOptions
+          : undefined;
+
+        const queryGenerator = this.source.sequelize.queryGenerator;
+
+        const existingReferencedTable = existingReference?.table
+          ? queryGenerator.extractTableDetails(existingReference.table)
+          : undefined;
+
+        const newReferencedTable = queryGenerator.extractTableDetails(this.target);
+
+        const newReference: AttributeReferencesOptions = {};
+        if (existingReferencedTable) {
+          if (!isEqual(existingReferencedTable, newReferencedTable)) {
+            throw new Error(`Foreign key ${this.foreignKey} on ${this.source.name} already references ${queryGenerator.quoteTable(existingReferencedTable)}, but this association needs to make it reference ${queryGenerator.quoteTable(newReferencedTable)} instead.`);
+          }
+        } else {
+          newReference.table = newReferencedTable;
+        }
+
+        if (existingReference?.key && existingReference.key !== this.targetKeyField) {
+          throw new Error(`Foreign key ${this.foreignKey} on ${this.source.name} already references column ${existingReference.key}, but this association needs to make it reference ${this.targetKeyField} instead.`);
+        }
+
+        newReference.key = this.targetKeyField;
+
+        newForeignKeyAttribute.references = newReference;
+        newForeignKeyAttribute.onDelete ??= newForeignKeyAttribute.allowNull !== false ? 'SET NULL' : 'CASCADE';
+        newForeignKeyAttribute.onUpdate ??= newForeignKeyAttribute.onUpdate ?? 'CASCADE';
+      }
+
+      this.source.mergeAttributesDefault({
+        [this.foreignKey]: newForeignKeyAttribute,
+      });
+
+      this.identifierField = getColumnName(this.source.getAttributes()[this.foreignKey]);
     } else {
-      // composite key flow
+      // Composite key flow
+      // TODO: fix this
+      this.targetKey = null as any;
+      this.foreignKey = null as any;
+      this.targetKeyField = null as any;
+      this.targetKeyIsPrimary = null as any;
+      this.identifierField = null as any;
+
       this.foreignKeys = options.foreignKeys as Array<{ source: SourceKey, target: TargetKey }>;
 
       // TODO: determine if still need to do this
@@ -193,8 +234,8 @@ export class BelongsTo<
       //   .map(fk => fk.source);
 
       const tk = [];
-      for (const key of targetKeys) {
-        tk.push(targetAttributes.get(key)!);
+      for (const targetKey of this.targetKeys) {
+        tk.push(targetAttributes.get(targetKey)!);
       }
 
       const queryGenerator = this.source.sequelize.queryGenerator;
@@ -214,90 +255,12 @@ export class BelongsTo<
         newFkAttributes.push({ targetKey: targetKeyIter.columnName, attributes: newForeignKeyAttribute });
       }
 
-      console.log(JSON.stringify(newFkAttributes, null, 2));
-
       for (const fk of newFkAttributes) {
         this.source.mergeAttributesDefault({
           [fk.targetKey]: fk.attributes,
         });
       }
-
-      // Get singular name, trying to uppercase the first letter, unless the model forbids it
-      const singular = upperFirst(this.options.name.singular);
-
-      this.accessors = {
-        get: `get${singular}`,
-        set: `set${singular}`,
-        create: `create${singular}`,
-      };
-
-      this.#mixin(source.prototype);
-
-      console.log('!???');
-      console.log(this.targetKeys);
-
-      this.targetKey = null as any;
-      this.foreignKey = null as any;
-      this.identifierField = null as any;
-      this.targetKeyField = null as any;
-      this.targetKeyIsPrimary = false;
-      // this.targetKey = null;
-
-      return;
     }
-
-    this.targetKeyField = getColumnName(targetAttributes.get(this.targetKey)!);
-    this.targetKeyIsPrimary = this.targetKey === this.target.primaryKeyAttribute;
-
-    const targetAttribute = targetAttributes.get(this.targetKey)!;
-
-    const existingForeignKey = source.modelDefinition.rawAttributes[this.foreignKey];
-    const newForeignKeyAttribute = removeUndefined({
-      type: cloneDataType(targetAttribute.type),
-      ...foreignKeyAttributeOptions,
-      allowNull: existingForeignKey?.allowNull ?? foreignKeyAttributeOptions?.allowNull,
-    });
-
-    // FK constraints are opt-in: users must either set `foreignKeyConstraints`
-    // on the association, or request an `onDelete` or `onUpdate` behavior
-    if (options.foreignKeyConstraints !== false) {
-      const existingReference = existingForeignKey?.references
-        ? (normalizeReference(existingForeignKey.references) ?? existingForeignKey.references) as AttributeReferencesOptions
-        : undefined;
-
-      const queryGenerator = this.source.sequelize.queryGenerator;
-
-      const existingReferencedTable = existingReference?.table
-        ? queryGenerator.extractTableDetails(existingReference.table)
-        : undefined;
-
-      const newReferencedTable = queryGenerator.extractTableDetails(this.target);
-
-      const newReference: AttributeReferencesOptions = {};
-      if (existingReferencedTable) {
-        if (!isEqual(existingReferencedTable, newReferencedTable)) {
-          throw new Error(`Foreign key ${this.foreignKey} on ${this.source.name} already references ${queryGenerator.quoteTable(existingReferencedTable)}, but this association needs to make it reference ${queryGenerator.quoteTable(newReferencedTable)} instead.`);
-        }
-      } else {
-        newReference.table = newReferencedTable;
-      }
-
-      if (existingReference?.key && existingReference.key !== this.targetKeyField) {
-        throw new Error(`Foreign key ${this.foreignKey} on ${this.source.name} already references column ${existingReference.key}, but this association needs to make it reference ${this.targetKeyField} instead.`);
-      }
-
-      newReference.key = this.targetKeyField;
-
-      newForeignKeyAttribute.references = newReference;
-      newForeignKeyAttribute.onDelete ??= newForeignKeyAttribute.allowNull !== false ? 'SET NULL' : 'CASCADE';
-      newForeignKeyAttribute.onUpdate ??= newForeignKeyAttribute.onUpdate ?? 'CASCADE';
-    }
-
-    this.source.mergeAttributesDefault({
-      [this.foreignKey]: newForeignKeyAttribute,
-    });
-
-    this.identifierField = getColumnName(this.source.getAttributes()[this.foreignKey]);
 
     // Get singular name, trying to uppercase the first letter, unless the model forbids it
     const singular = upperFirst(this.options.name.singular);
@@ -336,12 +299,32 @@ export class BelongsTo<
     }
   }
 
+  /**
+   * Edge case for hashing binary composite key for backwards compatibility (?)
+   * unclear if this only happens with 2 but tests are written for 2, but it was probably written
+   * that way to hack / 'support' composite primary keys for some scenarios like
+   * packages/core/test/unit/dialects/abstract/query.test.js:147
+   *
+   * @param targetAttributes
+   * @protected
+   */
+  protected shouldHashPrimaryKey(targetAttributes: MapView<string, NormalizedAttributeOptions<Model<any, any>>>): Boolean {
+    const primaryKeyAttributes = [];
+    for (const attributes of targetAttributes.values()) {
+      if (attributes.primaryKey) {
+        primaryKeyAttributes.push(attributes);
+      }
+    }
+
+    return primaryKeyAttributes.length === 2 && primaryKeyAttributes.some(attr => attr.type === 'BINARY(16)');
+  }
+
   static associate<
     S extends Model,
     T extends Model,
     SourceKey extends AttributeNames<S>,
     TargetKey extends AttributeNames<T>,
-    >(
+  >(
     secret: symbol,
     source: ModelStatic<S>,
     target: ModelStatic<T>,

@@ -315,14 +315,7 @@ export interface AssociationOptions<ForeignKey extends string = string> extends 
    */
   foreignKey?: ForeignKey | ForeignKeyOptions<ForeignKey>;
 
-  /**
-   * The configuration of the foreign keys Attribute. See {@link Sequelize#define}
-   * or {@link Model.init} for more information about the syntax.
-   *
-   * Using a string array is equivalent to passing a {@link ForeignKeyOptions} object
-   * with the {@link ForeignKeyOptions.name} option set.
-   */
-  foreignKeys?: string[] | Array<{ source: string, target: string }>;
+  foreignKeys?: ForeignKey[] | Array<{ source: string, target: string }>;
 
   /**
    * Should ON UPDATE, ON DELETE, and REFERENCES constraints be enabled on the foreign key.
