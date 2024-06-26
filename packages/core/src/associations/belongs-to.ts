@@ -1,6 +1,8 @@
 import assert from 'node:assert';
+import isEmpty from 'lodash/isEmpty.js';
 import isEqual from 'lodash/isEqual';
 import isObject from 'lodash/isObject.js';
+import some from 'lodash/some';
 import upperFirst from 'lodash/upperFirst';
 import { cloneDataType } from '../dialects/abstract/data-types-utils.js';
 import { AssociationError } from '../errors/index.js';
@@ -11,10 +13,9 @@ import type {
   CreateOptions,
   CreationAttributes,
   FindOptions,
-  ForeignKey,
   Model,
   ModelStatic,
-  SaveOptions,
+  SaveOptions
 } from '../model';
 import { normalizeReference } from '../model-definition.js';
 import { Op } from '../operators';
@@ -22,12 +23,12 @@ import { getColumnName } from '../utils/format.js';
 import { isSameInitialModel } from '../utils/model-utils.js';
 import { cloneDeep, removeUndefined } from '../utils/object.js';
 import { camelize } from '../utils/string.js';
-import { Association, ForeignKeyOptions } from './base';
 import type { AssociationOptions, SingleAssociationAccessors } from './base';
+import { Association } from './base';
 import { HasMany } from './has-many.js';
 import { HasOne } from './has-one.js';
-import { defineAssociation, mixinMethods, normalizeBaseAssociationOptions } from './helpers';
 import type { NormalizeBaseAssociationOptions } from './helpers';
+import { defineAssociation, mixinMethods, normalizeBaseAssociationOptions } from './helpers';
 
 /**
  * One-to-one association
@@ -110,8 +111,8 @@ export class BelongsTo<
     options: NormalizedBelongsToOptions<SourceKey, TargetKey>,
     parent?: Association,
   ) {
-    const targetKeys = options?.targetKey
-      ? [options.targetKey]
+    const targetKeys = !(some(options.foreignKeys, isEmpty))
+      ? options.foreignKeys?.map(fk => (fk as { target: string }).target) as TargetKey[]
       : target.modelDefinition.primaryKeysAttributeNames;
 
     const targetAttributes = target.modelDefinition.attributes;
@@ -128,7 +129,8 @@ export class BelongsTo<
 
     super(secret, source, target, options, parent);
 
-    this.targetKeys = Array.isArray(targetKeys) ? targetKeys : [...targetKeys].map(key => key as TargetKey);
+    this.targetKeys = targetKeys as TargetKey[];
+
     const isCompositeKey = this.targetKeys.length > 1;
 
     // edge case for hashing binary composite key for backwards compatibility (?)
@@ -149,7 +151,7 @@ export class BelongsTo<
     this.targetKey = targetKey as TargetKey;
     let foreignKeyAttributeOptions;
 
-    console.log(targetKey);
+    console.log('isCompositeKey', isCompositeKey);
 
     if (!isCompositeKey || shouldHashPrimaryKey) {
       // const [ targetKey ] = targetKeys;
@@ -179,44 +181,70 @@ export class BelongsTo<
         foreignKey = this.inferForeignKey();
       }
 
-      foreignKeys.push({ foreignKey: foreignKey as SourceKey, attributeOptions: foreignKeyAttributeOptions });
+      foreignKeys.push({ foreignKey: foreignKey as SourceKey });
       this.foreignKey = foreignKey as SourceKey;
     } else {
       // composite key flow
+      this.foreignKeys = options.foreignKeys as Array<{ source: SourceKey, target: TargetKey }>;
+
+      // TODO: determine if still need to do this
+      // const existingForeignKeys = this.foreignKeys
+      //   .filter(fk => source.modelDefinition.rawAttributes[fk.source] !== undefined)
+      //   .map(fk => fk.source);
+
+      const tk = [];
+      for (const key of targetKeys) {
+        tk.push(targetAttributes.get(key)!);
+      }
+
+      const queryGenerator = this.source.sequelize.queryGenerator;
+
+      const newFkAttributes = [];
+      const newReferencedTable = queryGenerator.extractTableDetails(this.target);
+      for (const targetKeyIter of tk) {
+        const newForeignKeyAttribute: any = removeUndefined({
+          type: cloneDataType(targetKeyIter.type),
+          name: targetKeyIter.columnName,
+          allowNull: false,
+          references: {
+            key: targetKeyIter.columnName,
+            table: newReferencedTable,
+          },
+        });
+        newFkAttributes.push({ targetKey: targetKeyIter.columnName, attributes: newForeignKeyAttribute });
+      }
+
+      console.log(JSON.stringify(newFkAttributes, null, 2));
+
+      for (const fk of newFkAttributes) {
+        this.source.mergeAttributesDefault({
+          [fk.targetKey]: fk.attributes,
+        });
+      }
+
+      // Get singular name, trying to uppercase the first letter, unless the model forbids it
+      const singular = upperFirst(this.options.name.singular);
+
+      this.accessors = {
+        get: `get${singular}`,
+        set: `set${singular}`,
+        create: `create${singular}`,
+      };
+
+      this.#mixin(source.prototype);
 
       console.log('!???');
       console.log(this.targetKeys);
 
       this.targetKey = null as any;
       this.foreignKey = null as any;
+      this.identifierField = null as any;
+      this.targetKeyField = null as any;
+      this.targetKeyIsPrimary = false;
       // this.targetKey = null;
-    }
 
-    // // For Db2 server, a reference column of a FOREIGN KEY must be unique
-    // // else, server throws SQL0573N error. Hence, setting it here explicitly
-    // // for non primary columns.
-    // if (target.sequelize.options.dialect === 'db2' && targetAttributes.get(this.targetKey)!.primaryKey !== true) {
-    //   // TODO: throw instead
-    //   this.target.modelDefinition.rawAttributes[this.targetKey].unique = true;
-    // }
-    //
-    // let foreignKey: string | undefined;
-    // let foreignKeyAttributeOptions;
-    // if (isObject(this.options?.foreignKey)) {
-    //   // lodash has poor typings
-    //   assert(typeof this.options?.foreignKey === 'object');
-    //
-    //   foreignKeyAttributeOptions = this.options.foreignKey;
-    //   foreignKey = this.options.foreignKey.name || this.options.foreignKey.fieldName;
-    // } else if (this.options?.foreignKey) {
-    //   foreignKey = this.options.foreignKey;
-    // }
-    //
-    // if (!foreignKey) {
-    //   foreignKey = this.inferForeignKey();
-    // }
-    //
-    // this.foreignKey = foreignKey as SourceKey;
+      return;
+    }
 
     this.targetKeyField = getColumnName(targetAttributes.get(this.targetKey)!);
     this.targetKeyIsPrimary = this.targetKey === this.target.primaryKeyAttribute;
