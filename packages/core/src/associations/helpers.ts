@@ -17,6 +17,7 @@ import { pluralize, singularize } from '../utils/string.js';
 import type { OmitConstructors } from '../utils/types.js';
 import type { Association, AssociationOptions, ForeignKeyOptions, NormalizedAssociationOptions } from './base';
 import type { ThroughOptions } from './belongs-to-many.js';
+import { isArray } from 'lodash';
 
 export function checkNamingCollision(source: ModelStatic<any>, associationName: string): void {
   if (Object.hasOwn(source.getAttributes(), associationName)) {
@@ -332,7 +333,7 @@ export function normalizeCompositeForeignKeyOptions<T extends string>(options: A
   source: string,
   target: string,
 }> {
-  if (Array.isArray(options.foreignKeys)) {
+  if (isArray(options.foreignKeys) && !some(options.foreignKeys, isEmpty)) {
     return options.foreignKeys.map(fk => {
       return typeof fk === 'string' ? { source: fk, target: fk } : fk;
     });
@@ -340,7 +341,15 @@ export function normalizeCompositeForeignKeyOptions<T extends string>(options: A
 
   const normalizedForeignKey = normalizeForeignKeyOptions(options.foreignKey);
 
-  return [{ source: normalizedForeignKey.name, target: normalizedForeignKey.name }];
+  const { targetKey, sourceKey } = options as any;
+  if (some(normalizedForeignKey, isEmpty) || normalizedForeignKey.name === undefined) {
+    return [];
+  }
+
+  // belongsTo has a targetKey option, which is the name of the column in the target table that the foreign key should reference.
+  // hasOne and hasMany have a sourceKey option, which is the name of the column in the source table that the foreign key should reference.
+  // belongsToMany has both sourceKey and targetKey, which are the names of the columns in the source and target tables that the foreign key should reference, respectively.
+  return [{ source: sourceKey ?? normalizedForeignKey.name, target: targetKey ?? normalizedForeignKey.name }];
 }
 
 export type MaybeForwardedModelStatic<M extends Model = Model> = ModelStatic<M> | ((sequelize: Sequelize) => ModelStatic<M>);
