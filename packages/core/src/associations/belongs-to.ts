@@ -1,8 +1,6 @@
 import assert from 'node:assert';
-import isEmpty from 'lodash/isEmpty.js';
 import isEqual from 'lodash/isEqual';
 import isObject from 'lodash/isObject.js';
-import some from 'lodash/some.js';
 import upperFirst from 'lodash/upperFirst';
 import { cloneDataType } from '../dialects/abstract/data-types-utils.js';
 import { AssociationError } from '../errors';
@@ -25,12 +23,12 @@ import type { MapView } from '../utils/immutability';
 import { isSameInitialModel } from '../utils/model-utils.js';
 import { cloneDeep, removeUndefined } from '../utils/object.js';
 import { camelize } from '../utils/string.js';
-import { Association } from './base';
 import type { AssociationOptions, SingleAssociationAccessors } from './base';
+import { Association } from './base';
 import { HasMany } from './has-many.js';
 import { HasOne } from './has-one.js';
-import { defineAssociation, mixinMethods, normalizeBaseAssociationOptions } from './helpers';
 import type { NormalizeBaseAssociationOptions } from './helpers';
+import { defineAssociation, mixinMethods, normalizeBaseAssociationOptions } from './helpers';
 
 /**
  * One-to-one association
@@ -90,6 +88,8 @@ export class BelongsTo<
 
   readonly targetKeyIsPrimary: boolean;
 
+  readonly isCompositeKey: boolean = false;
+
   /**
    * @deprecated use {@link BelongsTo.targetKey}
    */
@@ -112,6 +112,15 @@ export class BelongsTo<
     //   ? options.foreignKeys?.map(fk => (fk as { target: string }).target) as TargetKey[]
     //   : target.modelDefinition.primaryKeysAttributeNames;
 
+    // let targetKeys;
+    // if (options?.targetKey) {
+    //   targetKeys = [options.targetKey];
+    // } else if (!(some(options.foreignKeys, isEmpty))) {
+    //   targetKeys = options.foreignKeys?.map(fk => (fk as { target: string }).target) as TargetKey[];
+    // } else {
+    //   targetKeys = target.modelDefinition.primaryKeysAttributeNames;
+    // }
+
     const targetKeys = options?.targetKey
       ? [options.targetKey]
       : target.modelDefinition.primaryKeysAttributeNames;
@@ -132,10 +141,10 @@ export class BelongsTo<
 
     this.targetKeys = Array.isArray(targetKeys) ? targetKeys : [...targetKeys].map(key => key as TargetKey);
 
-    const isCompositeKey = this.targetKeys.length > 1;
+    this.isCompositeKey = this.targetKeys.length > 1;
     const shouldHashPrimaryKey = this.shouldHashPrimaryKey(targetAttributes);
 
-    if (!isCompositeKey || shouldHashPrimaryKey) {
+    if (!this.isCompositeKey || shouldHashPrimaryKey) {
       const [targetKey] = this.targetKeys;
       this.targetKey = targetKey;
 
@@ -405,17 +414,24 @@ export class BelongsTo<
           // only fetch entities that actually have a foreign key set
           .filter(foreignKey => foreignKey != null),
       };
-    } else {
+    } else if (this.targetKeyIsPrimary && !options.where) {
       const foreignKeyValue = instances[0].get(this.foreignKey);
 
-      if (this.targetKeyIsPrimary && !options.where) {
-        return Target.findByPk(
-          foreignKeyValue as any,
-          options,
-        );
+      return Target.findByPk(
+        foreignKeyValue as any,
+        options,
+      );
+    } else {
+      // TODO: combine once we can just have the foreignKey in the foreignKeys array all the time
+      if (this.isCompositeKey) {
+        for (const key of this.foreignKeys) {
+          where[key.target] = instances[0].get(key.source);
+        }
+
+      } else {
+        where[this.targetKey] = instances[0].get(this.foreignKey);
       }
 
-      where[this.targetKey] = foreignKeyValue;
       options.limit = null;
     }
 
