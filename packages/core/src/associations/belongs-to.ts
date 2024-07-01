@@ -1,6 +1,8 @@
 import assert from 'node:assert';
+import isEmpty from 'lodash/isEmpty.js';
 import isEqual from 'lodash/isEqual';
 import isObject from 'lodash/isObject.js';
+import some from 'lodash/some';
 import upperFirst from 'lodash/upperFirst';
 import { cloneDataType } from '../dialects/abstract/data-types-utils.js';
 import { AssociationError } from '../errors';
@@ -106,17 +108,12 @@ export class BelongsTo<
     options: NormalizedBelongsToOptions<SourceKey, TargetKey>,
     parent?: Association,
   ) {
-
-    // TODO: technically correct, but has some bugs, so must combine two approaches
-    // const targetKeys = !(some(options.foreignKeys, isEmpty))
-    //   ? options.foreignKeys?.map(fk => (fk as { target: string }).target) as TargetKey[]
-    //   : target.modelDefinition.primaryKeysAttributeNames;
-
+    // TODO: almost correct, but fails some tests
     // let targetKeys;
-    // if (options?.targetKey) {
+    // if (isEmpty(options.foreignKey) && isEmpty(options.foreignKeys) && options?.targetKey) {
     //   targetKeys = [options.targetKey];
-    // } else if (!(some(options.foreignKeys, isEmpty))) {
-    //   targetKeys = options.foreignKeys?.map(fk => (fk as { target: string }).target) as TargetKey[];
+    // } else if (!isEmpty(options.foreignKeys) && !some(options.foreignKeys, isEmpty)) {
+    //   targetKeys = options.foreignKeys!.map(fk => (fk as { target: string }).target) as TargetKey[];
     // } else {
     //   targetKeys = target.modelDefinition.primaryKeysAttributeNames;
     // }
@@ -247,19 +244,12 @@ export class BelongsTo<
         tk.push(targetAttributes.get(targetKey)!);
       }
 
-      const queryGenerator = this.source.sequelize.queryGenerator;
-
       const newFkAttributes = [];
-      const newReferencedTable = queryGenerator.extractTableDetails(this.target);
       for (const targetKeyIter of tk) {
         const newForeignKeyAttribute: any = removeUndefined({
           type: cloneDataType(targetKeyIter.type),
           name: targetKeyIter.columnName,
           allowNull: false,
-          references: {
-            key: targetKeyIter.columnName,
-            table: newReferencedTable,
-          },
         });
         newFkAttributes.push({ targetKey: targetKeyIter.columnName, attributes: newForeignKeyAttribute });
       }
@@ -269,6 +259,12 @@ export class BelongsTo<
           [fk.targetKey]: fk.attributes,
         });
       }
+
+      // TODO: define if we want to do this here (automagically) or define it in the model (only for composite keys)
+      // this.source.options.indexes = [...this.source.options.indexes, ({
+      //   type: 'unique',
+      //   fields: newFkAttributes.map(fk => fk.targetKey),
+      // })];
     }
 
     // Get singular name, trying to uppercase the first letter, unless the model forbids it
