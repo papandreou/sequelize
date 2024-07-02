@@ -234,7 +234,7 @@ export class BelongsTo<
 
       this.foreignKeys = options.foreignKeys as Array<{ source: SourceKey, target: TargetKey }>;
 
-      // TODO: determine if still need to do this
+      // TODO: determine if still need to do this, maybe for when the model is already created?
       // const existingForeignKeys = this.foreignKeys
       //   .filter(fk => source.modelDefinition.rawAttributes[fk.source] !== undefined)
       //   .map(fk => fk.source);
@@ -259,12 +259,6 @@ export class BelongsTo<
           [fk.targetKey]: fk.attributes,
         });
       }
-
-      // TODO: define if we want to do this here (automagically) or define it in the model (only for composite keys)
-      // this.source.options.indexes = [...this.source.options.indexes, ({
-      //   type: 'unique',
-      //   fields: newFkAttributes.map(fk => fk.targetKey),
-      // })];
     }
 
     // Get singular name, trying to uppercase the first letter, unless the model forbids it
@@ -405,6 +399,7 @@ export class BelongsTo<
     const where = Object.create(null);
 
     if (instances.length > 1) {
+      // TODO: fix for composite keys
       where[this.targetKey] = {
         [Op.in]: instances.map(instance => instance.get(this.foreignKey))
           // only fetch entities that actually have a foreign key set

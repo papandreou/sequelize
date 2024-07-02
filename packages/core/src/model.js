@@ -870,6 +870,20 @@ ${associationOwner._getAssociationDebugList()}`);
       await this.queryInterface.addIndex(tableName, index, options);
     }
 
+    for (const inlineReference of options.inlineForeignKeys || []) {
+      await this.queryInterface.addConstraint(tableName.tableName, {
+        fields: inlineReference.columns,
+        type: 'FOREIGN KEY',
+        name: `${tableName.tableName}_${inlineReference.columns.join('_')}_${inlineReference.foreignTable.tableName}_${inlineReference.foreignColumns.join('_')}_composite_fk`,
+        references: {
+          table: inlineReference.foreignTable,
+          fields: inlineReference.foreignColumns,
+        },
+        // onDelete: 'cascade',
+        // onUpdate: 'cascade'
+      });
+    }
+
     if (options.hooks) {
       await this.hooks.runAsync('afterSync', options);
     }

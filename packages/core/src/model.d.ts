@@ -2049,6 +2049,16 @@ export interface ModelOptions<M extends Model = Model> {
    * @default false
    */
   version?: boolean | string | undefined;
+
+  /**
+   * A container for complex (e.g. composite) foreignKeys.
+   */
+  inlineForeignKeys?: Array<{
+    readonly name?: string,
+    readonly columns: string[],
+    readonly foreignTable: string,
+    readonly foreignColumns: string[],
+  }>;
 }
 
 /**

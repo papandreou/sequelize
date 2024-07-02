@@ -164,6 +164,36 @@ describe(getTestDialectTeaser('Model.sync & Sequelize#sync'), () => {
     await sequelize.sync({ alter: true });
   });
 
+  it('should properly alter tables when there are foreign keys2', async () => {
+    const User = sequelize.define('User', {
+      userId: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+      },
+      tenantId: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+      },
+      username: DataTypes.STRING,
+    });
+    const Address = sequelize.define('Address', {
+      addressId: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+      },
+    }, {
+      inlineForeignKeys: [{
+        columns: ['userId', 'tenantId'],
+        foreignTable: User,
+        foreignColumns: ['userId', 'tenantId'],
+      }],
+    });
+    Address.belongsTo(User, { foreignKeys: ['userId', 'tenantId'] });
+
+    await sequelize.sync({ alter: true });
+    await sequelize.sync({ alter: true });
+  });
+
   it('creates one unique index for unique:true column', async () => {
     const User = sequelize.define('testSync', {
       email: {
