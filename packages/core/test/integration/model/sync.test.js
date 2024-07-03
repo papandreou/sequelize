@@ -191,11 +191,44 @@ describe(getTestDialectTeaser('Model.sync & Sequelize#sync'), () => {
     Address.belongsTo(User, { foreignKeys: ['userId', 'tenantId'] });
 
     await sequelize.sync({ alter: true });
-    const constraints = await sequelize.queryInterface.showConstraints(Address.getTableName());
-    const constraint = constraints.find(c => c.constraintType === 'FOREIGN KEY' && c.constraintName === 'Address_UserId_TenantId_User_UserId_TenantId_fkey');
+    const constraints = await sequelize.queryInterface.showConstraints(Address.getTableName(), { constraintType: 'FOREIGN KEY' });
+    const constraint = constraints.find(c => c.constraintType === 'FOREIGN KEY' && c.constraintName === 'Addresses_userId_tenantId_Users_userId_tenantId_composite_fk');
     expect(constraint.columnNames).to.deep.eq(['userId', 'tenantId']);
     expect(constraint.referencedColumnNames).to.deep.eq(['userId', 'tenantId']);
-    expect(constraint.tableName).to.eq('Users');
+    expect(constraint.referencedTableName).to.eq('Users');
+  });
+
+  it('should drop and create constraints on sync', async () => {
+    const User = sequelize.define('User', {
+      userId: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+      },
+      tenantId: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+      },
+      username: DataTypes.STRING,
+    });
+    const Address = sequelize.define('Address', {
+      addressId: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+      },
+    }, {
+      foreignKeyConstraints: [{
+        columns: ['userId', 'tenantId'],
+        foreignTable: User,
+        foreignColumns: ['userId', 'tenantId'],
+      }],
+    });
+    Address.belongsTo(User, { foreignKeys: ['userId', 'tenantId'] });
+
+    await sequelize.sync({ alter: true });
+    await sequelize.sync({ alter: true });
+    const constraints = await sequelize.queryInterface.showConstraints(Address.getTableName());
+    const constraint = constraints.find(c => c.constraintType === 'FOREIGN KEY' && c.constraintName === 'Addresses_userId_tenantId_Users_userId_tenantId_composite_fk');
+    expect(constraint).to.exist;
   });
 
   it('creates one unique index for unique:true column', async () => {
