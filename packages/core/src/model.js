@@ -870,7 +870,7 @@ ${associationOwner._getAssociationDebugList()}`);
       await this.queryInterface.addIndex(tableName, index, options);
     }
 
-    for (const inlineReference of options.inlineForeignKeys || []) {
+    for (const inlineReference of options.foreignKeyConstraints || []) {
       await this.queryInterface.addConstraint(tableName.tableName, {
         fields: inlineReference.columns,
         type: 'FOREIGN KEY',

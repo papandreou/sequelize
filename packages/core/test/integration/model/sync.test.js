@@ -164,7 +164,7 @@ describe(getTestDialectTeaser('Model.sync & Sequelize#sync'), () => {
     await sequelize.sync({ alter: true });
   });
 
-  it('should properly alter tables when there are foreign keys2', async () => {
+  it('should properly add composite fk constraint when appears in options', async () => {
     const User = sequelize.define('User', {
       userId: {
         type: DataTypes.INTEGER,
@@ -182,7 +182,7 @@ describe(getTestDialectTeaser('Model.sync & Sequelize#sync'), () => {
         primaryKey: true,
       },
     }, {
-      inlineForeignKeys: [{
+      foreignKeyConstraints: [{
         columns: ['userId', 'tenantId'],
         foreignTable: User,
         foreignColumns: ['userId', 'tenantId'],
@@ -191,7 +191,11 @@ describe(getTestDialectTeaser('Model.sync & Sequelize#sync'), () => {
     Address.belongsTo(User, { foreignKeys: ['userId', 'tenantId'] });
 
     await sequelize.sync({ alter: true });
-    await sequelize.sync({ alter: true });
+    const constraints = await sequelize.queryInterface.showConstraints(Address.getTableName());
+    const constraint = constraints.find(c => c.constraintType === 'FOREIGN KEY' && c.constraintName === 'Address_UserId_TenantId_User_UserId_TenantId_fkey');
+    expect(constraint.columnNames).to.deep.eq(['userId', 'tenantId']);
+    expect(constraint.referencedColumnNames).to.deep.eq(['userId', 'tenantId']);
+    expect(constraint.tableName).to.eq('Users');
   });
 
   it('creates one unique index for unique:true column', async () => {
