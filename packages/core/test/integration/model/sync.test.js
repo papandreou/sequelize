@@ -231,6 +231,46 @@ describe(getTestDialectTeaser('Model.sync & Sequelize#sync'), () => {
     expect(constraint).to.exist;
   });
 
+  // TODO edge case where the model doesnt declare any 'primary key'
+
+  it('should create composite foreign key constraint if fields are not primary key but unique constraint exists', async () => {
+    const User = sequelize.define('User', {
+      userId: {
+        type: DataTypes.INTEGER,
+      },
+      tenantId: {
+        type: DataTypes.INTEGER,
+      },
+      username: {
+        type: DataTypes.STRING,
+        primaryKey: true,
+      },
+    }, {
+      indexes: [{
+        unique: true,
+        fields: ['userId', 'tenantId'],
+      }],
+    });
+    const Address = sequelize.define('Address', {
+      addressId: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+      },
+    }, {
+      foreignKeyConstraints: [{
+        columns: ['userId', 'tenantId'],
+        foreignTable: User,
+        foreignColumns: ['userId', 'tenantId'],
+      }],
+    });
+    Address.belongsTo(User, { foreignKeys: ['userId', 'tenantId'] });
+
+    await sequelize.sync({ alter: true });
+    const constraints = await sequelize.queryInterface.showConstraints(Address.getTableName());
+    const constraint = constraints.find(c => c.constraintType === 'FOREIGN KEY' && c.constraintName === 'Addresses_userId_tenantId_Users_userId_tenantId_cfkey');
+    expect(constraint).to.exist;
+  });
+
   it('creates one unique index for unique:true column', async () => {
     const User = sequelize.define('testSync', {
       email: {

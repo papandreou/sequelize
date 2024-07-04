@@ -1,6 +1,8 @@
 import assert from 'node:assert';
+import every from 'lodash/every';
 import isEmpty from 'lodash/isEmpty.js';
 import isEqual from 'lodash/isEqual';
+import isNil from 'lodash/isNil';
 import isObject from 'lodash/isObject.js';
 import some from 'lodash/some';
 import upperFirst from 'lodash/upperFirst';
@@ -118,9 +120,19 @@ export class BelongsTo<
     //   targetKeys = target.modelDefinition.primaryKeysAttributeNames;
     // }
 
-    const targetKeys = options?.targetKey
+    const isForeignKeyEmpty = isEmpty(options.foreignKey);
+    const isForeignKeysValid = Array.isArray(options.foreignKeys)
+      && options.foreignKeys.length > 0
+      && options.foreignKeys.every(fk => !isEmpty(fk));
+
+    let targetKeys;
+    if (isForeignKeyEmpty && isForeignKeysValid) {
+      targetKeys = (options.foreignKeys as Array<{ source: SourceKey, target: TargetKey }>).map(fk => fk.target);
+    } else {
+      targetKeys = options?.targetKey
       ? [options.targetKey]
       : target.modelDefinition.primaryKeysAttributeNames;
+    }
 
     const targetAttributes = target.modelDefinition.attributes;
 
@@ -141,7 +153,45 @@ export class BelongsTo<
     this.isCompositeKey = this.targetKeys.length > 1;
     const shouldHashPrimaryKey = this.shouldHashPrimaryKey(targetAttributes);
 
-    if (!this.isCompositeKey || shouldHashPrimaryKey) {
+    if ((!isEmpty(options.foreignKeys) && isEmpty(options.foreignKey)) && !shouldHashPrimaryKey) {
+
+      // Composite key flow
+      // TODO: fix this
+      this.targetKey = null as any;
+      this.foreignKey = null as any;
+      this.targetKeyField = null as any;
+      this.targetKeyIsPrimary = null as any;
+      this.identifierField = null as any;
+
+      this.foreignKeys = options.foreignKeys as Array<{ source: SourceKey, target: TargetKey }>;
+
+      // TODO: determine if still need to do this, maybe for when the model is already created?
+      // const existingForeignKeys = this.foreignKeys
+      //   .filter(fk => source.modelDefinition.rawAttributes[fk.source] !== undefined)
+      //   .map(fk => fk.source);
+      // console.log('this.targetKeys', this.targetKeys);
+
+      const tk = [];
+      for (const targetKey of this.targetKeys) {
+        tk.push(targetAttributes.get(targetKey)!);
+      }
+
+      const newFkAttributes = [];
+      for (const targetKeyIter of tk) {
+        const newForeignKeyAttribute: any = removeUndefined({
+          type: cloneDataType(targetKeyIter.type),
+          name: targetKeyIter.columnName,
+          allowNull: false,
+        });
+        newFkAttributes.push({ targetKey: targetKeyIter.columnName, attributes: newForeignKeyAttribute });
+      }
+
+      for (const fk of newFkAttributes) {
+        this.source.mergeAttributesDefault({
+          [fk.targetKey]: fk.attributes,
+        });
+      }
+    } else {
       const [targetKey] = this.targetKeys;
       this.targetKey = targetKey;
 
@@ -223,43 +273,13 @@ export class BelongsTo<
       });
 
       this.identifierField = getColumnName(this.source.getAttributes()[this.foreignKey]);
-    } else {
-      // Composite key flow
-      // TODO: fix this
-      this.targetKey = null as any;
-      this.foreignKey = null as any;
-      this.targetKeyField = null as any;
-      this.targetKeyIsPrimary = null as any;
-      this.identifierField = null as any;
-
-      this.foreignKeys = options.foreignKeys as Array<{ source: SourceKey, target: TargetKey }>;
-
-      // TODO: determine if still need to do this, maybe for when the model is already created?
-      // const existingForeignKeys = this.foreignKeys
-      //   .filter(fk => source.modelDefinition.rawAttributes[fk.source] !== undefined)
-      //   .map(fk => fk.source);
-
-      const tk = [];
-      for (const targetKey of this.targetKeys) {
-        tk.push(targetAttributes.get(targetKey)!);
-      }
-
-      const newFkAttributes = [];
-      for (const targetKeyIter of tk) {
-        const newForeignKeyAttribute: any = removeUndefined({
-          type: cloneDataType(targetKeyIter.type),
-          name: targetKeyIter.columnName,
-          allowNull: false,
-        });
-        newFkAttributes.push({ targetKey: targetKeyIter.columnName, attributes: newForeignKeyAttribute });
-      }
-
-      for (const fk of newFkAttributes) {
-        this.source.mergeAttributesDefault({
-          [fk.targetKey]: fk.attributes,
-        });
-      }
     }
+
+    // if (!this.isCompositeKey || shouldHashPrimaryKey || !isNil(options.foreignKey)) {
+    //
+    // } else {
+    //
+    // }
 
     // Get singular name, trying to uppercase the first letter, unless the model forbids it
     const singular = upperFirst(this.options.name.singular);
