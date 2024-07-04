@@ -192,13 +192,13 @@ describe(getTestDialectTeaser('Model.sync & Sequelize#sync'), () => {
 
     await sequelize.sync({ alter: true });
     const constraints = await sequelize.queryInterface.showConstraints(Address.getTableName(), { constraintType: 'FOREIGN KEY' });
-    const constraint = constraints.find(c => c.constraintType === 'FOREIGN KEY' && c.constraintName === 'Addresses_userId_tenantId_Users_userId_tenantId_composite_fk');
+    const constraint = constraints.find(c => c.constraintType === 'FOREIGN KEY' && c.constraintName === 'Addresses_userId_tenantId_Users_userId_tenantId_cfkey');
     expect(constraint.columnNames).to.deep.eq(['userId', 'tenantId']);
     expect(constraint.referencedColumnNames).to.deep.eq(['userId', 'tenantId']);
     expect(constraint.referencedTableName).to.eq('Users');
   });
 
-  it('should drop and create constraints on sync', async () => {
+  it('should properly alter tables when there are composite foreign keys', async () => {
     const User = sequelize.define('User', {
       userId: {
         type: DataTypes.INTEGER,
@@ -227,7 +227,7 @@ describe(getTestDialectTeaser('Model.sync & Sequelize#sync'), () => {
     await sequelize.sync({ alter: true });
     await sequelize.sync({ alter: true });
     const constraints = await sequelize.queryInterface.showConstraints(Address.getTableName());
-    const constraint = constraints.find(c => c.constraintType === 'FOREIGN KEY' && c.constraintName === 'Addresses_userId_tenantId_Users_userId_tenantId_composite_fk');
+    const constraint = constraints.find(c => c.constraintType === 'FOREIGN KEY' && c.constraintName === 'Addresses_userId_tenantId_Users_userId_tenantId_cfkey');
     expect(constraint).to.exist;
   });
 
