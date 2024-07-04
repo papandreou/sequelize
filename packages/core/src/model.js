@@ -881,7 +881,7 @@ ${associationOwner._getAssociationDebugList()}`);
     const existingConstraints = await this.queryInterface.showConstraints(tableName, { ...options, constraintType: 'FOREIGN KEY' });
 
     for (const inlineReference of options.foreignKeyConstraints || []) {
-      const constraintName = `${tableName.tableName}_${inlineReference.columns.join('_')}_${inlineReference.foreignTable.tableName}_${inlineReference.foreignColumns.join('_')}_composite_fk`;
+      const constraintName = `${tableName.tableName}_${inlineReference.columns.join('_')}_${inlineReference.foreignTable.tableName}_${inlineReference.foreignColumns.join('_')}_cfkey`;
 
       if (!existingConstraints.some(constraint => constraint.constraintName === constraintName)) {
         await this.queryInterface.addConstraint(tableName.tableName, {
