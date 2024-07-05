@@ -1,10 +1,7 @@
 import assert from 'node:assert';
-import every from 'lodash/every';
 import isEmpty from 'lodash/isEmpty.js';
 import isEqual from 'lodash/isEqual';
-import isNil from 'lodash/isNil';
 import isObject from 'lodash/isObject.js';
-import some from 'lodash/some';
 import upperFirst from 'lodash/upperFirst';
 import { cloneDataType } from '../dialects/abstract/data-types-utils.js';
 import { AssociationError } from '../errors';
@@ -110,16 +107,6 @@ export class BelongsTo<
     options: NormalizedBelongsToOptions<SourceKey, TargetKey>,
     parent?: Association,
   ) {
-    // TODO: almost correct, but fails some tests
-    // let targetKeys;
-    // if (isEmpty(options.foreignKey) && isEmpty(options.foreignKeys) && options?.targetKey) {
-    //   targetKeys = [options.targetKey];
-    // } else if (!isEmpty(options.foreignKeys) && !some(options.foreignKeys, isEmpty)) {
-    //   targetKeys = options.foreignKeys!.map(fk => (fk as { target: string }).target) as TargetKey[];
-    // } else {
-    //   targetKeys = target.modelDefinition.primaryKeysAttributeNames;
-    // }
-
     const isForeignKeyEmpty = isEmpty(options.foreignKey);
     const isForeignKeysValid = Array.isArray(options.foreignKeys)
       && options.foreignKeys.length > 0
@@ -274,12 +261,6 @@ export class BelongsTo<
 
       this.identifierField = getColumnName(this.source.getAttributes()[this.foreignKey]);
     }
-
-    // if (!this.isCompositeKey || shouldHashPrimaryKey || !isNil(options.foreignKey)) {
-    //
-    // } else {
-    //
-    // }
 
     // Get singular name, trying to uppercase the first letter, unless the model forbids it
     const singular = upperFirst(this.options.name.singular);
