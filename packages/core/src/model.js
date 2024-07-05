@@ -788,16 +788,6 @@ ${associationOwner._getAssociationDebugList()}`);
       const foreignKeyReferences = tableInfos[1];
       const removedConstraints = {};
 
-      for (const columnName in physicalAttributes) {
-        if (!Object.hasOwn(physicalAttributes, columnName)) {
-          continue;
-        }
-
-        if (!columns[columnName] && !columns[physicalAttributes[columnName].field]) {
-          await this.queryInterface.addColumn(tableName, physicalAttributes[columnName].field || columnName, physicalAttributes[columnName], options);
-        }
-      }
-
       if (options.alter === true || typeof options.alter === 'object' && options.alter.drop !== false) {
         for (const columnName in columns) {
           if (!Object.hasOwn(columns, columnName)) {
@@ -806,6 +796,14 @@ ${associationOwner._getAssociationDebugList()}`);
 
           const currentAttribute = columnDefs[columnName];
           if (!currentAttribute) {
+            const foreignKeyConstraints = foreignKeyReferences.filter(fk => fk.columnNames.includes(columnName));
+            for (const fk of foreignKeyConstraints) {
+              if (!removedConstraints[fk.constraintName]) {
+                await this.queryInterface.removeConstraint(tableName, fk.constraintName, options);
+                removedConstraints[fk.constraintName] = true;
+              }
+            }
+
             await this.queryInterface.removeColumn(tableName, columnName, options);
             continue;
           }
@@ -826,14 +824,14 @@ ${associationOwner._getAssociationDebugList()}`);
             for (const foreignKeyReference of foreignKeyReferences) {
               const constraintName = foreignKeyReference.constraintName;
               if ((constraintName
-                && (foreignKeyReference.tableCatalog ? foreignKeyReference.tableCatalog === database : true)
-                && (schema ? foreignKeyReference.tableSchema === schema : true)
-                && foreignKeyReference.referencedTableName === foreignReferenceTableName
-                && foreignKeyReference.referencedColumnNames.includes(references.key)
-                && (foreignReferenceSchema
+                  && (foreignKeyReference.tableCatalog ? foreignKeyReference.tableCatalog === database : true)
+                  && (schema ? foreignKeyReference.tableSchema === schema : true)
+                  && foreignKeyReference.referencedTableName === foreignReferenceTableName
+                  && foreignKeyReference.referencedColumnNames.includes(references.key)
+                  && (foreignReferenceSchema
                     ? foreignKeyReference.referencedTableSchema === foreignReferenceSchema
                     : true)
-                && !removedConstraints[constraintName])
+                  && !removedConstraints[constraintName])
                 || this.sequelize.options.dialect === 'ibmi') {
                 // Remove constraint on foreign keys.
                 await this.queryInterface.removeConstraint(tableName, constraintName, options);
@@ -843,6 +841,16 @@ ${associationOwner._getAssociationDebugList()}`);
           }
 
           await this.queryInterface.changeColumn(tableName, columnName, currentAttribute, options);
+        }
+      }
+
+      for (const columnName in physicalAttributes) {
+        if (!Object.hasOwn(physicalAttributes, columnName)) {
+          continue;
+        }
+
+        if (!columns[columnName] && !columns[physicalAttributes[columnName].field]) {
+          await this.queryInterface.addColumn(tableName, physicalAttributes[columnName].field || columnName, physicalAttributes[columnName], options);
         }
       }
     }
@@ -870,18 +878,24 @@ ${associationOwner._getAssociationDebugList()}`);
       await this.queryInterface.addIndex(tableName, index, options);
     }
 
-    for (const inlineReference of options.foreignKeyConstraints || []) {
-      await this.queryInterface.addConstraint(tableName.tableName, {
-        fields: inlineReference.columns,
-        type: 'FOREIGN KEY',
-        name: `${tableName.tableName}_${inlineReference.columns.join('_')}_${inlineReference.foreignTable.tableName}_${inlineReference.foreignColumns.join('_')}_composite_fk`,
-        references: {
-          table: inlineReference.foreignTable,
-          fields: inlineReference.foreignColumns,
-        },
-        // onDelete: 'cascade',
-        // onUpdate: 'cascade'
-      });
+    const existingConstraints = await this.queryInterface.showConstraints(tableName, { ...options, constraintType: 'FOREIGN KEY' });
+
+    for (const fkConstraint of options.additionalForeignKeyConstraintDefinitions || []) {
+      const constraintName = fkConstraint.name ?? `${tableName.tableName}_${fkConstraint.columns.join('_')}_${fkConstraint.foreignTable.tableName}_${fkConstraint.foreignColumns.join('_')}_cfkey`;
+
+      if (!existingConstraints.some(constraint => constraint.constraintName === constraintName)) {
+        await this.queryInterface.addConstraint(tableName.tableName, {
+          fields: fkConstraint.columns,
+          type: 'FOREIGN KEY',
+          name: constraintName,
+          references: {
+            table: fkConstraint.foreignTable,
+            fields: fkConstraint.foreignColumns,
+          },
+          onDelete: fkConstraint.onDelete,
+          onUpdate: fkConstraint.onUpdate,
+        });
+      }
     }
 
     if (options.hooks) {
