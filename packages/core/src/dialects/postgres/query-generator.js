@@ -120,6 +120,7 @@ export class PostgresQueryGenerator extends PostgresQueryGeneratorTypeScript {
       attributesClause += `, PRIMARY KEY (${pks})`;
     }
 
+    console.log(`CREATE TABLE IF NOT EXISTS ${quotedTable} (${attributesClause})${comments}${columnComments};`);
     return `CREATE TABLE IF NOT EXISTS ${quotedTable} (${attributesClause})${comments}${columnComments};`;
   }
 

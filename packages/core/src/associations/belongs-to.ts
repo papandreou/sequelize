@@ -152,32 +152,23 @@ export class BelongsTo<
 
       this.foreignKeys = options.foreignKeys as Array<{ source: SourceKey, target: TargetKey }>;
 
-      // TODO: determine if still need to do this, maybe for when the model is already created?
-      // const existingForeignKeys = this.foreignKeys
-      //   .filter(fk => source.modelDefinition.rawAttributes[fk.source] !== undefined)
-      //   .map(fk => fk.source);
-      // console.log('this.targetKeys', this.targetKeys);
-
-      const tk = [];
+      const targetColumns = [];
       for (const targetKey of this.targetKeys) {
-        tk.push(targetAttributes.get(targetKey)!);
+        targetColumns.push(targetAttributes.get(targetKey)!);
       }
 
-      const newFkAttributes = [];
-      for (const targetKeyIter of tk) {
+      for (const targetColumn of targetColumns) {
+        const referencedColumn = source.modelDefinition.rawAttributes[targetColumn.columnName];
         const newForeignKeyAttribute: any = removeUndefined({
-          type: cloneDataType(targetKeyIter.type),
-          name: targetKeyIter.columnName,
-          allowNull: false,
+          type: cloneDataType(targetColumn.type),
+          name: targetColumn.columnName,
+          allowNull: Boolean(referencedColumn?.allowNull),
         });
-        newFkAttributes.push({ targetKey: targetKeyIter.columnName, attributes: newForeignKeyAttribute });
+        this.source.mergeAttributesDefault({
+          [targetColumn.columnName]: newForeignKeyAttribute,
+        });
       }
 
-      for (const fk of newFkAttributes) {
-        this.source.mergeAttributesDefault({
-          [fk.targetKey]: fk.attributes,
-        });
-      }
     } else {
       const [targetKey] = this.targetKeys;
       this.targetKey = targetKey;
