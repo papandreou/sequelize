@@ -152,12 +152,8 @@ export class BelongsTo<
 
       this.foreignKeys = options.foreignKeys as Array<{ source: SourceKey, target: TargetKey }>;
 
-      const targetColumns = [];
       for (const targetKey of this.targetKeys) {
-        targetColumns.push(targetAttributes.get(targetKey)!);
-      }
-
-      for (const targetColumn of targetColumns) {
+        const targetColumn = targetAttributes.get(targetKey)!;
         const referencedColumn = source.modelDefinition.rawAttributes[targetColumn.columnName];
         const newForeignKeyAttribute: any = removeUndefined({
           type: cloneDataType(targetColumn.type),
