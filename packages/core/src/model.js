@@ -880,20 +880,20 @@ ${associationOwner._getAssociationDebugList()}`);
 
     const existingConstraints = await this.queryInterface.showConstraints(tableName, { ...options, constraintType: 'FOREIGN KEY' });
 
-    for (const inlineReference of options.foreignKeyConstraints || []) {
-      const constraintName = `${tableName.tableName}_${inlineReference.columns.join('_')}_${inlineReference.foreignTable.tableName}_${inlineReference.foreignColumns.join('_')}_cfkey`;
+    for (const fkConstraint of options.additionalForeignKeyConstraintDefinitions || []) {
+      const constraintName = fkConstraint.name ?? `${tableName.tableName}_${fkConstraint.columns.join('_')}_${fkConstraint.foreignTable.tableName}_${fkConstraint.foreignColumns.join('_')}_cfkey`;
 
       if (!existingConstraints.some(constraint => constraint.constraintName === constraintName)) {
         await this.queryInterface.addConstraint(tableName.tableName, {
-          fields: inlineReference.columns,
+          fields: fkConstraint.columns,
           type: 'FOREIGN KEY',
           name: constraintName,
           references: {
-            table: inlineReference.foreignTable,
-            fields: inlineReference.foreignColumns,
+            table: fkConstraint.foreignTable,
+            fields: fkConstraint.foreignColumns,
           },
-          // onDelete: 'cascade',
-          // onUpdate: 'cascade'
+          onDelete: fkConstraint.onDelete,
+          onUpdate: fkConstraint.onUpdate,
         });
       }
     }

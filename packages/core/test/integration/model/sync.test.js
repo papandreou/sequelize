@@ -182,7 +182,7 @@ describe(getTestDialectTeaser('Model.sync & Sequelize#sync'), () => {
         primaryKey: true,
       },
     }, {
-      foreignKeyConstraints: [{
+      additionalForeignKeyConstraintDefinitions: [{
         columns: ['userId', 'tenantId'],
         foreignTable: User,
         foreignColumns: ['userId', 'tenantId'],
@@ -216,7 +216,7 @@ describe(getTestDialectTeaser('Model.sync & Sequelize#sync'), () => {
         primaryKey: true,
       },
     }, {
-      foreignKeyConstraints: [{
+      additionalForeignKeyConstraintDefinitions: [{
         columns: ['userId', 'tenantId'],
         foreignTable: User,
         foreignColumns: ['userId', 'tenantId'],
@@ -255,7 +255,7 @@ describe(getTestDialectTeaser('Model.sync & Sequelize#sync'), () => {
       },
     }, {
       noPrimaryKey: true,
-      foreignKeyConstraints: [{
+      additionalForeignKeyConstraintDefinitions: [{
         columns: ['userId', 'tenantId'],
         foreignTable: User,
         foreignColumns: ['userId', 'tenantId'],
@@ -288,7 +288,7 @@ describe(getTestDialectTeaser('Model.sync & Sequelize#sync'), () => {
       },
     }, {
       noPrimaryKey: true,
-      foreignKeyConstraints: [{
+      additionalForeignKeyConstraintDefinitions: [{
         columns: ['userId', 'tenantId'],
         foreignTable: User,
         foreignColumns: ['userId', 'tenantId'],
@@ -322,7 +322,7 @@ describe(getTestDialectTeaser('Model.sync & Sequelize#sync'), () => {
         primaryKey: true,
       },
     }, {
-      foreignKeyConstraints: [{
+      additionalForeignKeyConstraintDefinitions: [{
         columns: ['userId', 'tenantId'],
         foreignTable: User,
         foreignColumns: ['userId', 'tenantId'],

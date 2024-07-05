@@ -2051,13 +2051,15 @@ export interface ModelOptions<M extends Model = Model> {
   version?: boolean | string | undefined;
 
   /**
-   * A container for complex (e.g. composite) foreignKeys.
+   * A container for complex (e.g. composite) foreignKeys constraints.
    */
-  foreignKeyConstraints?: Array<{
+  additionalForeignKeyConstraintDefinitions?: Array<{
     readonly name?: string,
     readonly columns: string[],
-    readonly foreignTable: string,
+    readonly foreignTable: ModelStatic,
     readonly foreignColumns: string[],
+    readonly onDelete?: ReferentialAction,
+    readonly onUpdate?: ReferentialAction,
   }>;
 }
 
