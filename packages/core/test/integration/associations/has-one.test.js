@@ -144,10 +144,8 @@ describe(Support.getTestDialectTeaser('HasOne'), () => {
 
       await this.sequelize.sync({ force: true });
       const user = await User.create({ userId: 1, tenantId: 1 });
-      console.log("tasky task ====")
-      console.log(await user.createTask({ title: 'task' }));
+      await user.createTask({ title: 'task' });
       const task = await user.getTask();
-      console.log(task);
       expect(task).not.to.be.null;
       expect(task.title).to.equal('task');
       expect(task.userId).to.equal(1);
