@@ -1,20 +1,25 @@
+import type { AbstractDialect, ConnectionOptions, Options } from '@sequelize/core';
+import { DataTypes } from '@sequelize/core';
+import type { SqliteDialect } from '@sequelize/sqlite3';
 import { expect } from 'chai';
+import pick from 'lodash/pick';
 import type { Pool } from 'sequelize-pool';
 import sinon from 'sinon';
-import { DataTypes } from '@sequelize/core';
+import { CONFIG } from '../config/config';
 import {
+  sequelize as baseSequelize,
   beforeEach2,
+  createSequelizeInstance,
   destroySequelizeAfterTest,
-  getConnectionOptionsWithoutPool,
-  getSequelizeInstance,
+  getSqliteDatabasePath,
   getTestDialect,
   getTestDialectTeaser,
   setResetMode,
 } from './support';
 
-const dialect = getTestDialect();
+const dialectName = getTestDialect();
 describe(getTestDialectTeaser('Replication'), () => {
-  if (['sqlite', 'ibmi'].includes(dialect)) {
+  if (dialectName === 'ibmi') {
     return;
   }
 
@@ -22,30 +27,49 @@ describe(getTestDialectTeaser('Replication'), () => {
 
   describe('connection objects', () => {
     const deps = beforeEach2(async () => {
+      function getConnectionOptions(): ConnectionOptions<AbstractDialect> {
+        const out = pick(
+          CONFIG[getTestDialect()],
+          baseSequelize.dialect.getSupportedConnectionOptions(),
+        );
+
+        if (dialectName === 'sqlite3') {
+          (out as Options<SqliteDialect>).storage = getSqliteDatabasePath('replication.db');
+        }
+
+        return out;
+      }
+
       const sandbox = sinon.createSandbox();
-      const sequelize = getSequelizeInstance('', '', '', {
+      const sequelize = createSequelizeInstance({
         replication: {
-          write: getConnectionOptionsWithoutPool(),
-          read: [getConnectionOptionsWithoutPool()],
+          write: getConnectionOptions(),
+          read: [getConnectionOptions()],
         },
       });
 
       destroySequelizeAfterTest(sequelize);
 
-      expect(sequelize.connectionManager.pool.write).to.be.ok;
-      expect(sequelize.connectionManager.pool.read).to.be.ok;
+      expect(sequelize.pool.write).to.be.ok;
+      expect(sequelize.pool.read).to.be.ok;
 
       const User = sequelize.define('User', {
         firstName: {
           type: DataTypes.STRING,
-          field: 'first_name',
+          columnName: 'first_name',
         },
       });
 
       await User.sync({ force: true });
 
-      const readSpy = sandbox.spy(sequelize.connectionManager.pool.read! as Pool<object>, 'acquire');
-      const writeSpy = sandbox.spy(sequelize.connectionManager.pool.write as Pool<object>, 'acquire');
+      const readSpy = sandbox.spy(
+        sequelize.connectionManager.pool.read! as Pool<object>,
+        'acquire',
+      );
+      const writeSpy = sandbox.spy(
+        sequelize.connectionManager.pool.write as Pool<object>,
+        'acquire',
+      );
 
       return {
         User,
