@@ -107,37 +107,14 @@ export class BelongsTo<
     options: NormalizedBelongsToOptions<SourceKey, TargetKey>,
     parent?: Association,
   ) {
-    const isForeignKeyEmpty = isEmpty(options.foreignKey);
-    const isForeignKeysValid = Array.isArray(options.foreignKeys)
-      && options.foreignKeys.length > 0
-      && options.foreignKeys.every(fk => !isEmpty(fk));
-
-    let targetKeys;
-    if (isForeignKeyEmpty && isForeignKeysValid) {
-      targetKeys = (options.foreignKeys as Array<{ source: SourceKey, target: TargetKey }>).map(fk => fk.target);
-    } else {
-      targetKeys = options?.targetKey
-      ? [options.targetKey]
-      : target.modelDefinition.primaryKeysAttributeNames;
-    }
-
-    const targetAttributes = target.modelDefinition.attributes;
-
-    for (const key of targetKeys) {
-      if (!targetAttributes.has(key)) {
-        throw new Error(`Unknown attribute "${key}" passed as targetKey, define this attribute on model "${target.name}" first`);
-      }
-    }
-
     if ('keyType' in options) {
       throw new TypeError('Option "keyType" has been removed from the BelongsTo\'s options. Set "foreignKey.type" instead.');
     }
 
     super(secret, source, target, options, parent);
-
-    this.targetKeys = Array.isArray(targetKeys) ? targetKeys : [...targetKeys].map(key => key as TargetKey);
-
     this.isCompositeKey = this.targetKeys.length > 1;
+    const targetAttributes = target.modelDefinition.attributes;
+    this.setupTargetKeys(options, target);
     const shouldHashPrimaryKey = this.shouldHashPrimaryKey(targetAttributes);
 
     if ((!isEmpty(options.foreignKeys) && isEmpty(options.foreignKey)) && !shouldHashPrimaryKey) {
@@ -284,6 +261,31 @@ export class BelongsTo<
           throw new Error(`Invalid option received for "inverse.type": ${options.inverse.type} is not recognised. Expected "hasMany" or "hasOne"`);
       }
     }
+  }
+
+  private setupTargetKeys(options: NormalizedBelongsToOptions<SourceKey, TargetKey>, target: ModelStatic<T>) {
+    const isForeignKeyEmpty = isEmpty(options.foreignKey);
+    const isForeignKeysValid = Array.isArray(options.foreignKeys)
+      && options.foreignKeys.length > 0
+      && options.foreignKeys.every(fk => !isEmpty(fk));
+
+    let targetKeys;
+    if (isForeignKeyEmpty && isForeignKeysValid) {
+      targetKeys = (options.foreignKeys as Array<{ source: SourceKey, target: TargetKey }>).map(fk => fk.target);
+    } else {
+      targetKeys = options?.targetKey
+        ? [options.targetKey]
+        : target.modelDefinition.primaryKeysAttributeNames;
+    }
+
+    const targetAttributes = target.modelDefinition.attributes;
+    for (const key of targetKeys) {
+      if (!targetAttributes.has(key)) {
+        throw new Error(`Unknown attribute "${key}" passed as targetKey, define this attribute on model "${target.name}" first`);
+      }
+    }
+
+    this.targetKeys = Array.isArray(targetKeys) ? targetKeys : [...targetKeys].map(key => key as TargetKey);
   }
 
   /**
