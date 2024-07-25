@@ -1,11 +1,11 @@
 import type { PartialOrUndefined, StrictRequiredBy } from '@sequelize/utils';
+import type { ReplicationPoolOptions } from './abstract-dialect/base-replication-pool.js';
 import type { Connection } from './abstract-dialect/connection-manager.js';
 import type {
   AbstractDialect,
   ConnectionOptions,
   DialectOptions,
 } from './abstract-dialect/dialect.js';
-import type { ReplicationPoolOptions } from './abstract-dialect/replication-pool.js';
 import type {
   EphemeralSequelizeOptions,
   PersistedSequelizeOptions,

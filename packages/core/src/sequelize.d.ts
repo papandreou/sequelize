@@ -81,6 +81,10 @@ export interface ReplicationOptions<Dialect extends AbstractDialect> {
   write?: RawConnectionOptions<Dialect>;
 }
 
+export interface ShardedReplicationOptions<Dialect extends AbstractDialect> {
+  shards: Array<ReplicationOptions<Dialect> & { shardId: string }>;
+}
+
 export type RawConnectionOptions<Dialect extends AbstractDialect> =
   | (ConnectionOptions<Dialect> & { url?: string })
   | string;

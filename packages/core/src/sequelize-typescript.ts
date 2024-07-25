@@ -30,6 +30,10 @@ import type {
   TruncateOptions,
 } from '.';
 import type {
+  AcquireConnectionOptions,
+  BaseReplicationPool,
+} from './abstract-dialect/base-replication-pool.js';
+import type {
   AbstractConnection,
   GetConnectionOptions,
 } from './abstract-dialect/connection-manager.js';
@@ -39,7 +43,6 @@ import type { AbstractDialect, ConnectionOptions } from './abstract-dialect/dial
 import type { EscapeOptions } from './abstract-dialect/query-generator-typescript.js';
 import type { QiDropAllSchemasOptions } from './abstract-dialect/query-interface.types.js';
 import type { AbstractQuery } from './abstract-dialect/query.js';
-import type { AcquireConnectionOptions } from './abstract-dialect/replication-pool.js';
 import { ReplicationPool } from './abstract-dialect/replication-pool.js';
 import { initDecoratedAssociations } from './decorators/legacy/associations.js';
 import { initDecoratedModel } from './decorators/shared/model.js';
@@ -347,7 +350,8 @@ If you really need to access the connection manager, access it through \`sequeli
   readonly #models = new Set<ModelStatic>();
   readonly models = new ModelSetView<Dialect>(this, this.#models);
   #isClosed: boolean = false;
-  readonly pool: ReplicationPool<Connection<Dialect>, ConnectionOptions<Dialect>>;
+  // / readonly pool: ReplicationPool<Connection<Dialect>, ConnectionOptions<Dialect>>;
+  readonly pool?: BaseReplicationPool<Connection<Dialect>>;
 
   get modelManager(): never {
     throw new Error('Sequelize#modelManager was removed. Use Sequelize#models instead.');
@@ -663,60 +667,65 @@ Connection options can be used at the root of the option bag, in the "replicatio
       );
     }
 
-    this.pool = new ReplicationPool<Connection<Dialect>, ConnectionOptions<Dialect>>({
-      pool: {
-        max: 5,
-        min: 0,
-        idle: 10_000,
-        acquire: 60_000,
-        evict: 1000,
-        maxUses: Infinity,
-        ...(options.pool ? removeUndefined(options.pool) : undefined),
-      },
-      connect: async (connectOptions: ConnectionOptions<Dialect>): Promise<Connection<Dialect>> => {
-        if (this.isClosed()) {
-          throw new Error(
-            'sequelize.close was called, new connections cannot be established. If you did not mean for the Sequelize instance to be closed permanently, prefer using sequelize.pool.destroyAllNow instead.',
-          );
-        }
+    if (this.options.sharding) {
+    } else {
+      this.pool = new ReplicationPool<Connection<Dialect>, ConnectionOptions<Dialect>>({
+        pool: {
+          max: 5,
+          min: 0,
+          idle: 10_000,
+          acquire: 60_000,
+          evict: 1000,
+          maxUses: Infinity,
+          ...(options.pool ? removeUndefined(options.pool) : undefined),
+        },
+        connect: async (
+          connectOptions: ConnectionOptions<Dialect>,
+        ): Promise<Connection<Dialect>> => {
+          if (this.isClosed()) {
+            throw new Error(
+              'sequelize.close was called, new connections cannot be established. If you did not mean for the Sequelize instance to be closed permanently, prefer using sequelize.pool.destroyAllNow instead.',
+            );
+          }
 
-        const clonedConnectOptions = cloneDeepPlainValues(connectOptions, true);
-        await this.hooks.runAsync('beforeConnect', clonedConnectOptions);
+          const clonedConnectOptions = cloneDeepPlainValues(connectOptions, true);
+          await this.hooks.runAsync('beforeConnect', clonedConnectOptions);
 
-        const connection = await this.dialect.connectionManager.connect(clonedConnectOptions);
-        await this.hooks.runAsync('afterConnect', connection, clonedConnectOptions);
+          const connection = await this.dialect.connectionManager.connect(clonedConnectOptions);
+          await this.hooks.runAsync('afterConnect', connection, clonedConnectOptions);
 
-        if (!this.getDatabaseVersionIfExist()) {
-          await this.#initializeDatabaseVersion(connection);
-        }
+          if (!this.getDatabaseVersionIfExist()) {
+            await this.#initializeDatabaseVersion(connection);
+          }
 
-        return connection;
-      },
-      disconnect: async (connection: Connection<Dialect>): Promise<void> => {
-        await this.hooks.runAsync('beforeDisconnect', connection);
-        await this.dialect.connectionManager.disconnect(connection);
-        await this.hooks.runAsync('afterDisconnect', connection);
-      },
-      validate: (connection: Connection<Dialect>): boolean => {
-        if (options.pool?.validate) {
-          return options.pool.validate(connection);
-        }
+          return connection;
+        },
+        disconnect: async (connection: Connection<Dialect>): Promise<void> => {
+          await this.hooks.runAsync('beforeDisconnect', connection);
+          await this.dialect.connectionManager.disconnect(connection);
+          await this.hooks.runAsync('afterDisconnect', connection);
+        },
+        validate: (connection: Connection<Dialect>): boolean => {
+          if (options.pool?.validate) {
+            return options.pool.validate(connection);
+          }
 
-        return this.dialect.connectionManager.validate(connection);
-      },
-      beforeAcquire: async (acquireOptions: AcquireConnectionOptions): Promise<void> => {
-        return this.hooks.runAsync('beforePoolAcquire', acquireOptions);
-      },
-      afterAcquire: async (
-        connection: Connection<Dialect>,
-        acquireOptions: AcquireConnectionOptions,
-      ) => {
-        return this.hooks.runAsync('afterPoolAcquire', connection, acquireOptions);
-      },
-      timeoutErrorClass: ConnectionAcquireTimeoutError,
-      readConfig: this.options.replication.read,
-      writeConfig: this.options.replication.write,
-    });
+          return this.dialect.connectionManager.validate(connection);
+        },
+        beforeAcquire: async (acquireOptions: AcquireConnectionOptions): Promise<void> => {
+          return this.hooks.runAsync('beforePoolAcquire', acquireOptions);
+        },
+        afterAcquire: async (
+          connection: Connection<Dialect>,
+          acquireOptions: AcquireConnectionOptions,
+        ) => {
+          return this.hooks.runAsync('afterPoolAcquire', connection, acquireOptions);
+        },
+        timeoutErrorClass: ConnectionAcquireTimeoutError,
+        readConfig: this.options.replication.read,
+        writeConfig: this.options.replication.write,
+      });
+    }
 
     if (options.models) {
       this.addModels(options.models);
