@@ -2,76 +2,35 @@ import { pojo, shallowClonePojo } from '@sequelize/utils';
 import { Pool, TimeoutError } from 'sequelize-pool';
 import type { Class } from 'type-fest';
 import { logger } from '../utils/logger.js';
+import type {
+  AcquireConnectionOptions,
+  BasePoolDestroyOptions,
+  BasePoolGetPoolOptions,
+  BasePoolReleaseOptions,
+  BaseReplicationPool,
+  BaseReplicationPoolConfig,
+  ConnectionType,
+} from './base-replication-pool.js';
 
 const debug = logger.debugContext('pool');
 
-export type ConnectionType = 'read' | 'write';
-
-export interface ReplicationPoolOptions {
-  /**
-   * Maximum number of connections in pool. Default is 5
-   */
-  max: number;
-
-  /**
-   * Minimum number of connections in pool. Default is 0
-   */
-  min: number;
-
-  /**
-   * The maximum time, in milliseconds, that a connection can be idle before being released
-   */
-  idle: number;
-
-  /**
-   * The maximum time, in milliseconds, that pool will try to get connection before throwing error
-   */
-  acquire: number;
-
-  /**
-   * The time interval, in milliseconds, after which sequelize-pool will remove idle connections.
-   */
-  evict: number;
-
-  /**
-   * The number of times to use a connection before closing and replacing it.  Default is Infinity
-   */
-  maxUses: number;
-}
-
-export interface AcquireConnectionOptions {
-  /**
-   * Set which replica to use. Available options are `read` and `write`
-   */
-  type?: 'read' | 'write';
-
-  /**
-   * Force master or write replica to get connection from
-   */
-  useMaster?: boolean;
-}
-
-interface ReplicationPoolConfig<Connection extends object, ConnectionOptions extends object> {
-  readConfig: readonly ConnectionOptions[] | null;
-  writeConfig: ConnectionOptions;
-  pool: ReplicationPoolOptions;
-
-  // TODO: move this option to sequelize-pool so it applies to sub-pools as well
-  timeoutErrorClass?: Class<Error>;
-
-  connect(options: ConnectionOptions): Promise<Connection>;
-
-  disconnect(connection: Connection): Promise<void>;
-
-  validate(connection: Connection): boolean;
-
-  beforeAcquire?(options: AcquireConnectionOptions): Promise<void>;
-  afterAcquire?(connection: Connection, options: AcquireConnectionOptions): Promise<void>;
-}
-
 const owningPools = new WeakMap<object, 'read' | 'write'>();
 
-export class ReplicationPool<Connection extends object, ConnectionOptions extends object> {
+export type ReplicationPoolReleaseOptions<Connection> = BasePoolReleaseOptions & {
+  connection: Connection;
+};
+
+export type ReplicationPoolDestroyOptions<Connection> = BasePoolDestroyOptions & {
+  connection: Connection;
+};
+
+export type ReplicationPoolGetPoolOptions = BasePoolGetPoolOptions & {
+  poolType: ConnectionType;
+  useMaster?: boolean;
+};
+export class ReplicationPool<Connection extends object, ConnectionOptions extends object>
+  implements BaseReplicationPool<Connection>
+{
   /**
    * Replication read pool. Will only be used if the 'read' replication option has been provided,
    * otherwise the {@link write} will be used instead.
@@ -79,13 +38,13 @@ export class ReplicationPool<Connection extends object, ConnectionOptions extend
   readonly read: Pool<Connection> | null;
   readonly write: Pool<Connection>;
 
-  readonly #timeoutErrorClass: Class<TimeoutError> | undefined;
-  readonly #beforeAcquire: ((options: AcquireConnectionOptions) => Promise<void>) | undefined;
-  readonly #afterAcquire:
+  readonly timeoutErrorClass: Class<TimeoutError> | undefined;
+  readonly beforeAcquire: ((options: AcquireConnectionOptions) => Promise<void>) | undefined;
+  readonly afterAcquire:
     | ((connection: Connection, options: AcquireConnectionOptions) => Promise<void>)
     | undefined;
 
-  constructor(config: ReplicationPoolConfig<Connection, ConnectionOptions>) {
+  constructor(config: BaseReplicationPoolConfig<Connection, ConnectionOptions>) {
     const {
       connect,
       disconnect,
@@ -97,9 +56,9 @@ export class ReplicationPool<Connection extends object, ConnectionOptions extend
       writeConfig,
     } = config;
 
-    this.#beforeAcquire = beforeAcquire;
-    this.#afterAcquire = afterAcquire;
-    this.#timeoutErrorClass = timeoutErrorClass;
+    this.beforeAcquire = beforeAcquire;
+    this.afterAcquire = afterAcquire;
+    this.timeoutErrorClass = timeoutErrorClass;
 
     if (!readConfig || readConfig.length === 0) {
       // no replication, the write pool will always be used instead
@@ -157,7 +116,7 @@ export class ReplicationPool<Connection extends object, ConnectionOptions extend
 
   async acquire(options?: AcquireConnectionOptions | undefined) {
     options = options ? shallowClonePojo(options) : pojo();
-    await this.#beforeAcquire?.(options);
+    await this.beforeAcquire?.(options);
     Object.freeze(options);
 
     const { useMaster = false, type = 'write' } = options;
@@ -172,34 +131,34 @@ export class ReplicationPool<Connection extends object, ConnectionOptions extend
     try {
       connection = await pool.acquire();
     } catch (error) {
-      if (this.#timeoutErrorClass && error instanceof TimeoutError) {
-        throw new this.#timeoutErrorClass(error.message, { cause: error });
+      if (this.timeoutErrorClass && error instanceof TimeoutError) {
+        throw new this.timeoutErrorClass(error.message, { cause: error });
       }
 
       throw error;
     }
 
-    await this.#afterAcquire?.(connection, options);
+    await this.afterAcquire?.(connection, options);
 
     return connection;
   }
 
-  release(client: Connection): void {
-    const connectionType = owningPools.get(client);
+  release(options: ReplicationPoolReleaseOptions<Connection>): void {
+    const connectionType = owningPools.get(options.connection);
     if (!connectionType) {
       throw new Error('Unable to determine to which pool the connection belongs');
     }
 
-    this.getPool(connectionType).release(client);
+    this.getPool({ poolType: connectionType }).release(options.connection);
   }
 
-  async destroy(client: Connection): Promise<void> {
-    const connectionType = owningPools.get(client);
+  async destroy(options: ReplicationPoolDestroyOptions<Connection>): Promise<void> {
+    const connectionType = owningPools.get(options.connection);
     if (!connectionType) {
       throw new Error('Unable to determine to which pool the connection belongs');
     }
 
-    await this.getPool(connectionType).destroy(client);
+    await this.getPool({ poolType: connectionType }).destroy(options.connection);
     debug('connection destroy');
   }
 
@@ -213,8 +172,8 @@ export class ReplicationPool<Connection extends object, ConnectionOptions extend
     await Promise.all([this.write.drain(), this.read?.drain()]);
   }
 
-  getPool(poolType: ConnectionType): Pool<Connection> {
-    if (poolType === 'read' && this.read != null) {
+  getPool(options: ReplicationPoolGetPoolOptions): Pool<Connection> {
+    if (options.poolType === 'read' && this.read != null) {
       return this.read;
     }
 
