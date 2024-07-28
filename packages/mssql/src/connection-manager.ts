@@ -108,7 +108,7 @@ export class MsSqlConnectionManager extends AbstractConnectionManager<
             isErrorWithStringCode(error) &&
             (error.code === 'ESOCKET' || error.code === 'ECONNRESET')
           ) {
-            void this.pool.destroy({ connection });
+            void this.sequelize.pool!.destroy({ connection });
           }
         });
 
