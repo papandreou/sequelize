@@ -75,6 +75,10 @@ export interface PostgresConnectionOptions
    * Maximum wait time for lock requests in milliseconds. Added in pg v8.8.0.
    */
   lock_timeout?: number;
+
+  shardId?: string | undefined;
+}
+
 function mapResultToTypeOids(rows: any[], oidMap: Map<number, TypeOids>): Map<number, TypeOids> {
   if (rows.length === 0) {
     return oidMap;
