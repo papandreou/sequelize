@@ -43,188 +43,6 @@ export interface PostgresConnection extends AbstractConnection, Pg.Client {
   // Private property of pg-client
   // TODO: ask pg to expose a stable, readonly, property we can use
   _ending?: boolean;
-  shardId?: string | undefined;
-}
-
-function mapResultToTypeOids(rows: any[], oidMap: Map<number, TypeOids>): Map<number, TypeOids> {
-  if (rows.length === 0) {
-    return oidMap;
-  }
-
-  for (const row of rows) {
-    // Mapping base types and their arrays
-    // Array types are declared twice, once as part of the same row as the base type, once as their own row.
-    if (!oidMap.has(row.oid)) {
-      oidMap.set(row.oid, {
-        oid: row.oid,
-        typeName: row.typname,
-        type: 'base',
-      });
-    }
-
-    if (row.typarray) {
-      oidMap.set(row.typarray, {
-        oid: row.typarray,
-        typeName: row.typname,
-        type: 'array',
-        baseOid: row.oid,
-      });
-    }
-
-    if (row.rngtypid) {
-      oidMap.set(row.rngtypid, {
-        oid: row.rngtypid,
-        typeName: row.rngtypname,
-        type: 'range',
-        baseOid: row.oid,
-      });
-    }
-
-    if (row.rngtyparray) {
-      oidMap.set(row.rngtyparray, {
-        oid: row.rngtyparray,
-        typeName: row.rngtypname,
-        type: 'range-array',
-        baseOid: row.oid,
-        rangeOid: row.rngtypid,
-      });
-    }
-  }
-
-  return oidMap;
-}
-
-async function queryOids(connection: PgConnection | Sequelize) {
-  const sql = `
-  WITH ranges AS (SELECT pg_range.rngtypid,
-                         pg_type.typname  AS rngtypname,
-                         pg_type.typarray AS rngtyparray,
-                         pg_range.rngsubtype
-                  FROM pg_range
-                         LEFT OUTER JOIN pg_type
-                                         ON pg_type.oid = pg_range.rngtypid)
-  SELECT pg_type.typname,
-         pg_type.typtype,
-         pg_type.oid,
-         pg_type.typarray,
-         ranges.rngtypname,
-         ranges.rngtypid,
-         ranges.rngtyparray
-  FROM pg_type
-         LEFT OUTER JOIN ranges
-                         ON pg_type.oid = ranges.rngsubtype
-  WHERE (pg_type.typtype IN ('b', 'e'));
-`;
-
-  let results;
-  if (connection instanceof Sequelize) {
-    results = (await connection.query(sql)).pop();
-  } else {
-    results = await connection.query(sql);
-  }
-
-  // When searchPath is prepended then two statements are executed and the result is
-  // an array of those two statements. First one is the SET search_path and second is
-  // the SELECT query result.
-  if (Array.isArray(results) && results[0].command === 'SET') {
-    results = results.pop();
-  }
-
-  return results;
-}
-
-class CustomTypeParser {
-  #oidMap: Map<number, TypeOids>;
-
-  readonly #oidParserCache = new Map<number, TypeParser<any, any>>();
-
-  readonly #id: string;
-
-  readonly #lib: Lib;
-  readonly #dialect: PostgresDialect;
-  readonly #arrayParserLib: ArrayParserLib;
-
-  private _invalid: boolean = false;
-
-  constructor(
-    dialect: PostgresDialect,
-    lib: Lib,
-    arrayParserLib: ArrayParserLib,
-    id: string = 'default',
-  ) {
-    this.#id = id;
-    this.#oidMap = new Map<number, TypeOids>();
-
-    this.#dialect = dialect;
-    this.#lib = lib;
-    this.#arrayParserLib = arrayParserLib;
-  }
-
-  get id(): string {
-    return this.#id;
-  }
-
-  get valid(): boolean {
-    return !this._invalid;
-  }
-
-  invalidate(): void {
-    this._invalid = true;
-  }
-
-  getTypeParser(oid: TypeId, format?: TypeFormat): TypeParser<any, any> {
-    const cachedParser = this.#oidParserCache.get(oid);
-
-    if (cachedParser) {
-      return cachedParser;
-    }
-
-    const customParser = this.#getCustomTypeParser(oid, format);
-    if (customParser) {
-      this.#oidParserCache.set(oid, customParser);
-
-      return customParser;
-    }
-
-    // @ts-expect-error -- pg did not provide a broadly-typed version of getTypeParser. The typing boilerplate is not worth the result.
-    return this.#lib.types.getTypeParser(oid, format);
-  }
-
-  async refreshOidMap(connection: PgConnection): Promise<void> {
-    const { rows } = await queryOids(connection);
-
-    const newNameOidMap = new Map<number, TypeOids>();
-
-    this.#oidMap = mapResultToTypeOids(rows, newNameOidMap);
-
-    this.#oidParserCache.clear();
-  }
-
-  #getCustomTypeParser(oid: TypeId, format?: TypeFormat): TypeParser<any, any> | null {
-    const typeData = this.#oidMap.get(oid);
-
-    if (!typeData) {
-      return null;
-    }
-
-    if (typeData.type === 'range-array') {
-      return this.#buildArrayParser(this.getTypeParser(typeData.rangeOid!, format));
-    }
-
-    if (typeData.type === 'array') {
-      return this.#buildArrayParser(this.getTypeParser(typeData.baseOid!, format));
-    }
-
-    const parser = this.#dialect.getParserForDatabaseDataType(typeData.typeName);
-
-    return parser ?? null;
-  }
-
-  #buildArrayParser(subTypeParser: (value: string) => unknown): (source: string) => unknown[] {
-    return (source: string) => {
-      return this.#arrayParserLib.parse(source, subTypeParser);
-    };
-  }
 }
 
 export interface PostgresConnectionOptions
@@ -292,9 +110,7 @@ export class PostgresConnectionManager extends AbstractConnectionManager<
       port: 5432,
       ...config,
       types: {
-        getTypeParser: (oid: TypeId, format?: TypeFormat) => {
-          return typeParser.getTypeParser(oid, format);
-        },
+        getTypeParser: (oid: TypeId, format?: TypeFormat) => this.getTypeParser(oid, format),
       },
     };
 
@@ -385,7 +201,7 @@ export class PostgresConnectionManager extends AbstractConnectionManager<
     connection.on('error', (error: any) => {
       connection._invalid = true;
       debug(`connection error ${error.code || error.message}`);
-      void this.pool.destroy({ connection });
+      void this.sequelize.pool.destroy(connection);
     });
 
     let query = '';
@@ -418,9 +234,7 @@ export class PostgresConnectionManager extends AbstractConnectionManager<
       await connection.query(query);
     }
 
-    connection.shardId = config.shardId || undefined;
-
-    await typeParser.refreshOidMap(connection);
+    await this.#refreshOidMap(connection);
 
     return connection;
   }
@@ -439,36 +253,6 @@ export class PostgresConnectionManager extends AbstractConnectionManager<
     return !connection._invalid && !connection._ending;
   }
 
-  #loadCustomTypeParser(config: ConnectionOptions): CustomTypeParser {
-    let typeParser;
-
-    // if the sharding is enable then let's build the parser map with the shardId
-    // later any other mapping strategy can be used in any case in the future more customtypeparser is needed
-    if (config.shardId) {
-      typeParser = this.#typeParserMap.get(config.shardId);
-      if (!typeParser) {
-        typeParser = new CustomTypeParser(
-          this.dialect,
-          this.lib,
-          this.#arrayParserLib,
-          config.shardId,
-        );
-        this.#typeParserMap.set(config.shardId, typeParser);
-      }
-
-      return typeParser;
-    }
-
-    // falling back to having a default type parser for the whole connection manager shared with all connections
-
-    if (!this.#defaultTypeParser) {
-      this.#defaultTypeParser = new CustomTypeParser(this.dialect, this.lib, this.#arrayParserLib);
-    }
-
-    return this.#defaultTypeParser;
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async #refreshOidMap(connection: PostgresConnection | Sequelize): Promise<void> {
     const sql = `
       WITH ranges AS (SELECT pg_range.rngtypid,
@@ -491,15 +275,18 @@ export class PostgresConnectionManager extends AbstractConnectionManager<
       WHERE (pg_type.typtype IN ('b', 'e'));
     `;
 
-    // we need to invalidate all the type parsers
-    // as the dynamic refresh might have been introduced some changes which can impact the oid mapping such as adding a new enum type
-    for (const customtypeparser of this.#typeParserMap.values()) {
-      customtypeparser.invalidate();
+    let results;
+    if (connection instanceof Sequelize) {
+      results = (await connection.query(sql)).pop();
+    } else {
+      results = await connection.query(sql);
     }
 
-    // also invalidate the default type parser if exists
-    if (this.#defaultTypeParser) {
-      this.#defaultTypeParser.invalidate();
+    // When searchPath is prepended then two statements are executed and the result is
+    // an array of those two statements. First one is the SET search_path and second is
+    // the SELECT query result.
+    if (Array.isArray(results) && results[0].command === 'SET') {
+      results = results.pop();
     }
 
     const oidMap = this.#oidMap;
