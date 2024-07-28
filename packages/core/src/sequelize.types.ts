@@ -10,7 +10,10 @@ import type {
   EphemeralSequelizeOptions,
   PersistedSequelizeOptions,
 } from './sequelize.internals.js';
-import type { NormalizedReplicationOptions } from './sequelize.js';
+import type {
+  NormalizedReplicationOptions,
+  NormalizedShardedReplicationOptions,
+} from './sequelize.js';
 
 /**
  * Connection Pool options.
@@ -53,4 +56,5 @@ export type NormalizedOptions<Dialect extends AbstractDialect> = StrictRequiredB
   | 'defaultTimestampPrecision'
 > & {
   replication: NormalizedReplicationOptions<Dialect>;
+  sharding: NormalizedShardedReplicationOptions<Dialect>;
 };

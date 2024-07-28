@@ -98,6 +98,16 @@ export interface NormalizedReplicationOptions<Dialect extends AbstractDialect> {
   write: ConnectionOptions<Dialect>;
 }
 
+export interface NormalizedShardedOption<Dialect extends AbstractDialect> {
+  shardId: string;
+  read: ReadonlyArray<ConnectionOptions<Dialect>>;
+  write: ConnectionOptions<Dialect>;
+}
+
+export interface NormalizedShardedReplicationOptions<Dialect extends AbstractDialect> {
+  shards: Array<NormalizedShardedOption<Dialect>>;
+}
+
 export type DialectName = (typeof SUPPORTED_DIALECTS)[number];
 
 export interface LegacyDialectOptions {

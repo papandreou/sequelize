@@ -70,6 +70,11 @@ export interface AcquireConnectionOptions {
    * Force master or write replica to get connection from
    */
   useMaster?: boolean;
+
+  /**
+   * Force connection to use the shard specified by `shardId`
+   */
+  shardId?: string | undefined;
 }
 
 export interface BaseReplicationPool<Connection extends object> {
@@ -78,7 +83,7 @@ export interface BaseReplicationPool<Connection extends object> {
     | Array<Pool<Connection>>
     | Map<string, Pool<Connection> | null>
     | null;
-  readonly write: Pool<Connection> | Array<Pool<Connection>> | Map<string, Pool<Connection>>;
+  readonly write: Pool<Connection> | Array<Pool<Connection>> | Map<string, Pool<Connection> | null>;
 
   readonly timeoutErrorClass: Class<TimeoutError> | undefined;
   readonly beforeAcquire: ((options: AcquireConnectionOptions) => Promise<void>) | undefined;

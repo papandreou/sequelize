@@ -5,8 +5,8 @@ import { logger } from '../utils/logger.js';
 import type {
   AcquireConnectionOptions,
   BaseReplicationPool,
-  BaseReplicationPoolConfig,
   ConnectionType,
+  ReplicationPoolOptions,
 } from './base-replication-pool.js';
 
 import type {
@@ -17,30 +17,35 @@ import type {
 
 type ShardValue = `read:${string}` | `write:${string}`;
 
-export type ConnectioConnectionnShardConfig<ConnectionOptions extends object> = {
-  shardId: string;
-  readConfig: ConnectionOptions[] | null;
-  writeConfig: ConnectionOptions;
-};
-
 export interface ShardedReplicationPoolConfig<
   Connection extends object,
   ConnectionOptions extends object,
-> extends BaseReplicationPoolConfig<Connection, ConnectionOptions> {
+> {
   shards: Array<ShardConfig<Connection, ConnectionOptions>>;
+  pool: ReplicationPoolOptions;
+
+  // TODO: move this option to sequelize-pool so it applies to sub-pools as well
+  timeoutErrorClass?: Class<Error>;
+
+  connect(options: ConnectionOptions): Promise<Connection>;
+
+  disconnect(connection: Connection): Promise<void>;
+
+  validate(connection: Connection): boolean;
+
+  beforeAcquire?(options: AcquireConnectionOptions): Promise<void>;
+  afterAcquire?(connection: Connection, options: AcquireConnectionOptions): Promise<void>;
 }
 
-type ShardIdentifier = { shardId: string };
-
-type ShardedReplicationPoolAcquireOptions = AcquireConnectionOptions & ShardIdentifier;
+type ShardedReplicationPoolAcquireOptions = AcquireConnectionOptions & ShardedObject;
 
 type ShardedReplicationPoolReleaseOptions<Connection extends object> =
-  ReplicationPoolReleaseOptions<Connection> & ShardIdentifier;
+  ReplicationPoolReleaseOptions<Connection> & ShardedObject;
 
 type ShardedReplicationPoolDestroyOptions<Connection extends object> =
-  ReplicationPoolDestroyOptions<Connection> & ShardIdentifier;
+  ReplicationPoolDestroyOptions<Connection> & ShardedObject;
 
-type ShardedReplicationPoolGetPoolOptions = ReplicationPoolGetPoolOptions & ShardIdentifier;
+type ShardedReplicationPoolGetPoolOptions = ReplicationPoolGetPoolOptions & ShardedObject;
 
 const debug = logger.debugContext('pool');
 
@@ -52,31 +57,31 @@ function shardValueToTuple(shardValue: ShardValue): [string, ConnectionType] {
   return [shardId, type as ConnectionType];
 }
 
-interface ShardedObject extends Object {
+export interface ShardedObject extends Object {
   shardId?: string | undefined;
 }
 
-export interface ShardConfig<Connection extends ShardedObject, ConnectionOptions extends object>
-  extends Pick<
-      BaseReplicationPoolConfig<Connection, ConnectionOptions>,
-      'readConfig' | 'writeConfig'
-    >,
-    ShardedObject {}
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export interface ShardConfig<Connection extends object, ConnectionOptions extends object> {
+  shardId: string;
+  readConfig: readonly ConnectionOptions[] | null;
+  writeConfig: ConnectionOptions;
+}
 
 export class ShardedReplicationPool<
-  Connection extends ShardedObject,
-  ConnectionOptions extends ShardedObject,
-> implements BaseReplicationPool<Connection>
+  ShardedConnection extends ShardedObject,
+  ShardedConnectionOptions extends ShardedObject,
+> implements BaseReplicationPool<ShardedConnection>
 {
-  readonly read = new Map<string, Pool<Connection> | null>();
-  readonly write = new Map<string, Pool<Connection>>();
+  readonly read = new Map<string, Pool<ShardedConnection> | null>();
+  readonly write = new Map<string, Pool<ShardedConnection>>();
   timeoutErrorClass: Class<TimeoutError> | undefined;
   beforeAcquire: ((options: AcquireConnectionOptions) => Promise<void>) | undefined;
   afterAcquire:
-    | ((connection: Connection, options: AcquireConnectionOptions) => Promise<void>)
+    | ((connection: ShardedConnection, options: AcquireConnectionOptions) => Promise<void>)
     | undefined;
 
-  constructor(config: ShardedReplicationPoolConfig<Connection, ConnectionOptions>) {
+  constructor(config: ShardedReplicationPoolConfig<ShardedConnection, ShardedConnectionOptions>) {
     const { connect, disconnect, validate, shards } = config;
 
     for (const shard of shards) {
@@ -84,7 +89,7 @@ export class ShardedReplicationPool<
       if (!readConfig || readConfig.length === 0) {
         // no replication, the write pool will always be used instead
 
-        this.read.set(shard.shardId!, null);
+        this.read.set(shard.shardId, null);
       } else {
         let reads = 0;
         const pool = new Pool({
@@ -110,7 +115,7 @@ export class ShardedReplicationPool<
           maxUses: config.pool.maxUses,
         });
 
-        this.read.set(shardId!, pool);
+        this.read.set(shardId, pool);
       }
 
       const write = new Pool({
@@ -133,11 +138,11 @@ export class ShardedReplicationPool<
         maxUses: config.pool.maxUses,
       });
 
-      this.write.set(shardId!, write);
+      this.write.set(shardId, write);
     }
   }
 
-  async acquire(options: ShardedReplicationPoolAcquireOptions): Promise<Connection> {
+  async acquire(options: ShardedReplicationPoolAcquireOptions): Promise<ShardedConnection> {
     if (options?.type !== 'read' && options?.type !== 'write') {
       throw new Error(`Expected queryType to be either read or write. Received ${options.type}`);
     }
@@ -158,7 +163,7 @@ export class ShardedReplicationPool<
     return connection;
   }
 
-  release({ connection }: ShardedReplicationPoolReleaseOptions<Connection>): void {
+  release({ connection }: ShardedReplicationPoolReleaseOptions<ShardedConnection>): void {
     const shardValue = owningPools.get(connection);
     if (!shardValue) {
       throw new Error('Unable to determine to which sharded pool the connection belongs');
@@ -169,7 +174,9 @@ export class ShardedReplicationPool<
     this.getPool({ shardId, poolType: type, useMaster: false })?.release(connection);
   }
 
-  async destroy({ connection }: ShardedReplicationPoolDestroyOptions<Connection>): Promise<void> {
+  async destroy({
+    connection,
+  }: ShardedReplicationPoolDestroyOptions<ShardedConnection>): Promise<void> {
     const shardValue = owningPools.get(connection);
     if (!shardValue) {
       throw new Error('Unable to determine to which sharded pool the connection belongs');
@@ -215,12 +222,12 @@ export class ShardedReplicationPool<
     shardId,
     poolType,
     useMaster,
-  }: ShardedReplicationPoolGetPoolOptions): Pool<Connection> | null {
+  }: ShardedReplicationPoolGetPoolOptions): Pool<ShardedConnection> | null {
     if (poolType === 'read' && this.read != null && !useMaster) {
-      return this.read.get(shardId) ?? null;
+      return this.read.get(shardId!) ?? null;
     }
 
-    return this.write.get(shardId) ?? null;
+    return this.write.get(shardId!) ?? null;
   }
 
   shardSize(shardId: string): number {
