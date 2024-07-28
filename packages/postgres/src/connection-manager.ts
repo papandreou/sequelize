@@ -201,7 +201,7 @@ export class PostgresConnectionManager extends AbstractConnectionManager<
     connection.on('error', (error: any) => {
       connection._invalid = true;
       debug(`connection error ${error.code || error.message}`);
-      void this.sequelize.pool.destroy(connection);
+      void this.sequelize.pool!.destroy(connection);
     });
 
     let query = '';
