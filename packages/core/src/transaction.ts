@@ -175,7 +175,7 @@ export class Transaction {
     if (this.parent) {
       connection = this.parent.#connection;
     } else {
-      connection = await this.sequelize.pool.acquire({
+      connection = await this.sequelize.pool!.acquire({
         type: this.options.readOnly ? 'read' : 'write',
         shardId: this.options.shardId,
       });
@@ -248,7 +248,7 @@ export class Transaction {
       return;
     }
 
-    this.sequelize.pool.release(this.#connection);
+    this.sequelize.pool!.release(this.#connection);
     this.#connection.uuid = undefined;
     this.#connection = undefined;
   }
@@ -271,7 +271,7 @@ export class Transaction {
     const connection = this.#connection;
     this.#connection = undefined;
 
-    await this.sequelize.pool.destroy(connection);
+    await this.sequelize.pool!.destroy(connection);
   }
 
   /**
