@@ -71,7 +71,7 @@ export class HasOne<
    * The Column Name of the source key.
    */
   get sourceKeyField(): string {
-    return this.inverse.targetKeyField;
+    return this.inverse.targetKeyField(this.sourceKey);
   }
 
   /**

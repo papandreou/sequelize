@@ -82,7 +82,7 @@ export class HasMany<
   }
 
   get sourceKeyField(): string {
-    return this.inverse.targetKeyField;
+    return this.inverse.targetKeyField(this.inverse.targetKey);
   }
 
   readonly inverse: BelongsTo<T, S, TargetKey, SourceKey>;

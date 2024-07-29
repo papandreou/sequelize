@@ -81,14 +81,17 @@ export class BelongsTo<
 
   targetKeys: TargetKey[] = [];
 
-  /**
-   * The column name of the target key
-   */
-  // TODO: rename to targetKeyColumnName
-  readonly targetKeyField: string;
-
   targetKeyIsPrimary(targetKey: TargetKey): boolean {
     return this.target.modelDefinition.primaryKeysAttributeNames.has(targetKey);
+  }
+
+  /**
+   * The column name of the target key
+   *
+   * @param targetKey
+   */
+  targetKeyField(targetKey: TargetKey): string {
+    return getColumnName(this.target.modelDefinition.attributes.get(targetKey)!);
   }
 
   readonly isCompositeKey: boolean = false;
@@ -127,7 +130,6 @@ export class BelongsTo<
       // TODO: fix this
       this.targetKey = null as any;
       this.foreignKey = null as any;
-      this.targetKeyField = null as any;
       this.identifierField = null as any;
 
       this.foreignKeys = options.foreignKeys as Array<{ source: SourceKey, target: TargetKey }>;
@@ -175,7 +177,6 @@ export class BelongsTo<
 
       this.foreignKey = foreignKey as SourceKey;
 
-      this.targetKeyField = getColumnName(targetAttributes.get(this.targetKey)!);
       const targetAttribute = targetAttributes.get(this.targetKey)!;
 
       const existingForeignKey = source.modelDefinition.rawAttributes[this.foreignKey];
@@ -209,11 +210,11 @@ export class BelongsTo<
           newReference.table = newReferencedTable;
         }
 
-        if (existingReference?.key && existingReference.key !== this.targetKeyField) {
+        if (existingReference?.key && existingReference.key !== this.targetKeyField(this.targetKey)) {
           throw new Error(`Foreign key ${this.foreignKey} on ${this.source.name} already references column ${existingReference.key}, but this association needs to make it reference ${this.targetKeyField} instead.`);
         }
 
-        newReference.key = this.targetKeyField;
+        newReference.key = this.targetKeyField(this.targetKey);
 
         newForeignKeyAttribute.references = newReference;
         newForeignKeyAttribute.onDelete ??= newForeignKeyAttribute.allowNull !== false ? 'SET NULL' : 'CASCADE';
