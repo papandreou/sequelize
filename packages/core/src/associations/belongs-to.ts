@@ -87,7 +87,9 @@ export class BelongsTo<
   // TODO: rename to targetKeyColumnName
   readonly targetKeyField: string;
 
-  readonly targetKeyIsPrimary: boolean;
+  targetKeyIsPrimary(targetKey: TargetKey): boolean {
+    return this.target.modelDefinition.primaryKeysAttributeNames.has(targetKey);
+  }
 
   readonly isCompositeKey: boolean = false;
 
@@ -115,6 +117,8 @@ export class BelongsTo<
     this.isCompositeKey = this.targetKeys.length > 1;
     const targetAttributes = target.modelDefinition.attributes;
     this.setupTargetKeys(options, target);
+    // this.setupForeignKey(options);
+
     const shouldHashPrimaryKey = this.shouldHashPrimaryKey(targetAttributes);
 
     if ((!isEmpty(options.foreignKeys) && isEmpty(options.foreignKey)) && !shouldHashPrimaryKey) {
@@ -124,7 +128,6 @@ export class BelongsTo<
       this.targetKey = null as any;
       this.foreignKey = null as any;
       this.targetKeyField = null as any;
-      this.targetKeyIsPrimary = null as any;
       this.identifierField = null as any;
 
       this.foreignKeys = options.foreignKeys as Array<{ source: SourceKey, target: TargetKey }>;
@@ -173,8 +176,6 @@ export class BelongsTo<
       this.foreignKey = foreignKey as SourceKey;
 
       this.targetKeyField = getColumnName(targetAttributes.get(this.targetKey)!);
-      this.targetKeyIsPrimary = this.targetKey === this.target.primaryKeyAttribute;
-
       const targetAttribute = targetAttributes.get(this.targetKey)!;
 
       const existingForeignKey = source.modelDefinition.rawAttributes[this.foreignKey];
@@ -288,6 +289,31 @@ export class BelongsTo<
     this.targetKeys = Array.isArray(targetKeys) ? targetKeys : [...targetKeys].map(key => key as TargetKey);
   }
 
+  // private setupForeignKey(options: NormalizedBelongsToOptions<SourceKey, TargetKey>) {
+  //   if (Array.isArray(options.foreignKeys) && options.foreignKeys.length > 0) {
+  //     this.foreignKeys = options.foreignKeys as Array<{ source: SourceKey, target: TargetKey }>;
+  //   } else {
+  //     let foreignKey: string | undefined;
+  //     // let foreignKeyAttributeOptions;
+  //     if (isObject(this.options?.foreignKey)) {
+  //       // lodash has poor typings
+  //       assert(typeof this.options?.foreignKey === 'object');
+  //
+  //       // foreignKeyAttributeOptions = this.options.foreignKey;
+  //       foreignKey = this.options.foreignKey.name || this.options.foreignKey.fieldName;
+  //     } else if (this.options?.foreignKey) {
+  //       foreignKey = this.options.foreignKey;
+  //     }
+  //
+  //     if (!foreignKey) {
+  //       foreignKey = this.inferForeignKey();
+  //     }
+  //
+  //     this.foreignKeys = [{ source: foreignKey as SourceKey, target: this.targetKeys[0] }];
+  //     // this.foreignKey = foreignKey as SourceKey;
+  //   }
+  // }
+
   /**
    * Edge case for hashing binary composite key for backwards compatibility (?)
    * unclear if this only happens with 2 but tests are written for 2, but it was probably written
@@ -395,7 +421,7 @@ export class BelongsTo<
           // only fetch entities that actually have a foreign key set
           .filter(foreignKey => foreignKey != null),
       };
-    } else if (this.targetKeyIsPrimary && !options.where) {
+    } else if (this.targetKeyIsPrimary(this.targetKey) && !options.where) {
       const foreignKeyValue = instances[0].get(this.foreignKey);
 
       return Target.findByPk(
