@@ -1,5 +1,6 @@
 import type { AbstractConnection, ConnectionOptions } from '@sequelize/core';
 import { AbstractConnectionManager, ConnectionError } from '@sequelize/core';
+import type { ReplicationPool } from '@sequelize/core/_non-semver-use-at-your-own-risk_/abstract-dialect/replication-pool.js';
 import { logger } from '@sequelize/core/_non-semver-use-at-your-own-risk_/utils/logger.js';
 import { checkFileExists } from '@sequelize/utils/node';
 import fs from 'node:fs/promises';
@@ -100,7 +101,10 @@ export class SqliteConnectionManager extends AbstractConnectionManager<
 
     const isTemporaryStorage = inMemory || storage === '';
     if (isTemporaryStorage) {
-      const pool = this.sequelize.pool;
+      const pool = this.sequelize.pool as ReplicationPool<
+        SqliteConnection,
+        ConnectionOptions<SqliteDialect>
+      >;
       const writePool = pool.write;
 
       // @ts-expect-error -- PR sequelize-pool to expose `idleTimeoutMillis`

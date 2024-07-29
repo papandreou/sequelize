@@ -358,14 +358,13 @@ Use Sequelize#query if you wish to use replacements.`);
     return await retry(async () => {
       checkTransaction();
 
-      const connection = options.transaction
-        ? options.transaction.getConnection()
-        : options.connection
-          ? options.connection
-          : await this.pool.acquire({
-              useMaster: options.useMaster,
-              type: options.type === 'SELECT' ? 'read' : 'write',
-            });
+      const connection = options.transaction ? options.transaction.getConnection()
+        : options.connection ? options.connection
+        : await this.connectionManager.getConnection({
+          useMaster: options.useMaster,
+          type: options.type === 'SELECT' ? 'read' : 'write',
+          shardId: options.shardId,
+        });
 
       if (this.dialect.name === 'db2' && options.alter && options.alter.drop === false) {
         connection.dropTable = false;

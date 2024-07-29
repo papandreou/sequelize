@@ -117,7 +117,7 @@ export class MySqlConnectionManager extends AbstractConnectionManager<
           case 'ECONNRESET':
           case 'EPIPE':
           case 'PROTOCOL_CONNECTION_LOST':
-            void this.sequelize.pool.destroy(connection);
+            void this.sequelize.pool!.destroy(connection);
             break;
           default:
         }

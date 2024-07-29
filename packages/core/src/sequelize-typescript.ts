@@ -30,8 +30,13 @@ import type {
   TruncateOptions,
 } from '.';
 import type {
+  AcquireConnectionOptions,
+  BaseReplicationPool,
+} from './abstract-dialect/base-replication-pool.js';
+import type {
   AbstractConnection,
   GetConnectionOptions,
+  ShardedConnection,
 } from './abstract-dialect/connection-manager.js';
 import { normalizeDataType, validateDataType } from './abstract-dialect/data-types-utils.js';
 import type { AbstractDataType } from './abstract-dialect/data-types.js';
@@ -39,8 +44,8 @@ import type { AbstractDialect, ConnectionOptions } from './abstract-dialect/dial
 import type { EscapeOptions } from './abstract-dialect/query-generator-typescript.js';
 import type { QiDropAllSchemasOptions } from './abstract-dialect/query-interface.types.js';
 import type { AbstractQuery } from './abstract-dialect/query.js';
-import type { AcquireConnectionOptions } from './abstract-dialect/replication-pool.js';
 import { ReplicationPool } from './abstract-dialect/replication-pool.js';
+import { ShardedReplicationPool } from './abstract-dialect/sharded-replication-pool';
 import { initDecoratedAssociations } from './decorators/legacy/associations.js';
 import { initDecoratedModel } from './decorators/shared/model.js';
 import { ConnectionAcquireTimeoutError } from './errors/connection/connection-acquire-timeout-error.js';
@@ -75,7 +80,10 @@ import {
   normalizeTransactionOptions,
 } from './transaction.js';
 import { getIntersection } from './utils/array.js';
-import { normalizeReplicationConfig } from './utils/connection-options.js';
+import {
+  normalizeReplicationConfig,
+  normalizeShardedReplicationConfig,
+} from './utils/connection-options.js';
 import * as Deprecations from './utils/deprecations.js';
 import { showAllToListSchemas } from './utils/deprecations.js';
 import { removeUndefined, untypedMultiSplitObject } from './utils/object.js';
@@ -347,7 +355,8 @@ If you really need to access the connection manager, access it through \`sequeli
   readonly #models = new Set<ModelStatic>();
   readonly models = new ModelSetView<Dialect>(this, this.#models);
   #isClosed: boolean = false;
-  readonly pool: ReplicationPool<Connection<Dialect>, ConnectionOptions<Dialect>>;
+  // / readonly pool: ReplicationPool<Connection<Dialect>, ConnectionOptions<Dialect>>;
+  readonly pool?: BaseReplicationPool<Connection<Dialect>>;
 
   get modelManager(): never {
     throw new Error('Sequelize#modelManager was removed. Use Sequelize#models instead.');
@@ -638,6 +647,11 @@ Connection options can be used at the root of the option bag, in the "replicatio
         connectionOptions as RawConnectionOptions<Dialect>,
         options.replication,
       ),
+      sharding: normalizeShardedReplicationConfig(
+        this.dialect,
+        connectionOptions as RawConnectionOptions<Dialect>,
+        options.sharding,
+      ),
     });
 
     if (options.databaseVersion) {
@@ -663,60 +677,126 @@ Connection options can be used at the root of the option bag, in the "replicatio
       );
     }
 
-    this.pool = new ReplicationPool<Connection<Dialect>, ConnectionOptions<Dialect>>({
-      pool: {
-        max: 5,
-        min: 0,
-        idle: 10_000,
-        acquire: 60_000,
-        evict: 1000,
-        maxUses: Infinity,
-        ...(options.pool ? removeUndefined(options.pool) : undefined),
-      },
-      connect: async (connectOptions: ConnectionOptions<Dialect>): Promise<Connection<Dialect>> => {
-        if (this.isClosed()) {
-          throw new Error(
-            'sequelize.close was called, new connections cannot be established. If you did not mean for the Sequelize instance to be closed permanently, prefer using sequelize.pool.destroyAllNow instead.',
-          );
-        }
+    if (this.options.sharding) {
+      const shards = this.options.sharding.shards.map((shard: any) => {
+        return { shardId: shard.shardId, writeConfig: shard.write, readConfig: shard.read };
+      });
 
-        const clonedConnectOptions = cloneDeepPlainValues(connectOptions, true);
-        await this.hooks.runAsync('beforeConnect', clonedConnectOptions);
+      this.pool = new ShardedReplicationPool<
+        ShardedConnection<Dialect>,
+        ConnectionOptions<Dialect>
+      >({
+        pool: {
+          max: 5,
+          min: 0,
+          idle: 10_000,
+          acquire: 60_000,
+          evict: 1000,
+          maxUses: Infinity,
+        },
+        connect: async (
+          connectOptions: ConnectionOptions<Dialect>,
+        ): Promise<Connection<Dialect>> => {
+          if (this.isClosed()) {
+            throw new Error(
+              'sequelize.close was called, new connections cannot be established. If you did not mean for the Sequelize instance to be closed permanently, prefer using sequelize.pool.destroyAllNow instead.',
+            );
+          }
 
-        const connection = await this.dialect.connectionManager.connect(clonedConnectOptions);
-        await this.hooks.runAsync('afterConnect', connection, clonedConnectOptions);
+          const clonedConnectOptions = cloneDeepPlainValues(connectOptions, true);
+          await this.hooks.runAsync('beforeConnect', clonedConnectOptions);
 
-        if (!this.getDatabaseVersionIfExist()) {
-          await this.#initializeDatabaseVersion(connection);
-        }
+          const connection = await this.dialect.connectionManager.connect(clonedConnectOptions);
+          await this.hooks.runAsync('afterConnect', connection, clonedConnectOptions);
 
-        return connection;
-      },
-      disconnect: async (connection: Connection<Dialect>): Promise<void> => {
-        await this.hooks.runAsync('beforeDisconnect', connection);
-        await this.dialect.connectionManager.disconnect(connection);
-        await this.hooks.runAsync('afterDisconnect', connection);
-      },
-      validate: (connection: Connection<Dialect>): boolean => {
-        if (options.pool?.validate) {
-          return options.pool.validate(connection);
-        }
+          if (!this.getDatabaseVersionIfExist()) {
+            await this.#initializeDatabaseVersion(connection);
+          }
 
-        return this.dialect.connectionManager.validate(connection);
-      },
-      beforeAcquire: async (acquireOptions: AcquireConnectionOptions): Promise<void> => {
-        return this.hooks.runAsync('beforePoolAcquire', acquireOptions);
-      },
-      afterAcquire: async (
-        connection: Connection<Dialect>,
-        acquireOptions: AcquireConnectionOptions,
-      ) => {
-        return this.hooks.runAsync('afterPoolAcquire', connection, acquireOptions);
-      },
-      timeoutErrorClass: ConnectionAcquireTimeoutError,
-      readConfig: this.options.replication.read,
-      writeConfig: this.options.replication.write,
-    });
+          return connection;
+        },
+        disconnect: async (connection: ShardedConnection<Dialect>): Promise<void> => {
+          await this.hooks.runAsync('beforeDisconnect', connection);
+          await this.dialect.connectionManager.disconnect(connection);
+          await this.hooks.runAsync('afterDisconnect', connection);
+        },
+        validate: (connection: ShardedConnection<Dialect>): boolean => {
+          if (options.pool?.validate) {
+            return options.pool.validate(connection);
+          }
+
+          return this.dialect.connectionManager.validate(connection);
+        },
+        beforeAcquire: async (acquireOptions: AcquireConnectionOptions): Promise<void> => {
+          return this.hooks.runAsync('beforePoolAcquire', acquireOptions);
+        },
+        afterAcquire: async (
+          connection: ShardedConnection<Dialect>,
+          acquireOptions: AcquireConnectionOptions,
+        ) => {
+          return this.hooks.runAsync('afterPoolAcquire', connection, acquireOptions);
+        },
+        timeoutErrorClass: ConnectionAcquireTimeoutError,
+        shards,
+      });
+    } else {
+      this.pool = new ReplicationPool<Connection<Dialect>, ConnectionOptions<Dialect>>({
+        pool: {
+          max: 5,
+          min: 0,
+          idle: 10_000,
+          acquire: 60_000,
+          evict: 1000,
+          maxUses: Infinity,
+          ...(options.pool ? removeUndefined(options.pool) : undefined),
+        },
+        connect: async (
+          connectOptions: ConnectionOptions<Dialect>,
+        ): Promise<Connection<Dialect>> => {
+          if (this.isClosed()) {
+            throw new Error(
+              'sequelize.close was called, new connections cannot be established. If you did not mean for the Sequelize instance to be closed permanently, prefer using sequelize.pool.destroyAllNow instead.',
+            );
+          }
+
+          const clonedConnectOptions = cloneDeepPlainValues(connectOptions, true);
+          await this.hooks.runAsync('beforeConnect', clonedConnectOptions);
+
+          const connection = await this.dialect.connectionManager.connect(clonedConnectOptions);
+          await this.hooks.runAsync('afterConnect', connection, clonedConnectOptions);
+
+          if (!this.getDatabaseVersionIfExist()) {
+            await this.#initializeDatabaseVersion(connection);
+          }
+
+          return connection;
+        },
+        disconnect: async (connection: Connection<Dialect>): Promise<void> => {
+          await this.hooks.runAsync('beforeDisconnect', connection);
+          await this.dialect.connectionManager.disconnect(connection);
+          await this.hooks.runAsync('afterDisconnect', connection);
+        },
+        validate: (connection: Connection<Dialect>): boolean => {
+          if (options.pool?.validate) {
+            return options.pool.validate(connection);
+          }
+
+          return this.dialect.connectionManager.validate(connection);
+        },
+        beforeAcquire: async (acquireOptions: AcquireConnectionOptions): Promise<void> => {
+          return this.hooks.runAsync('beforePoolAcquire', acquireOptions);
+        },
+        afterAcquire: async (
+          connection: Connection<Dialect>,
+          acquireOptions: AcquireConnectionOptions,
+        ) => {
+          return this.hooks.runAsync('afterPoolAcquire', connection, acquireOptions);
+        },
+        timeoutErrorClass: ConnectionAcquireTimeoutError,
+        readConfig: this.options.replication.read,
+        writeConfig: this.options.replication.write,
+      });
+    }
 
     if (options.models) {
       this.addModels(options.models);
@@ -769,7 +849,7 @@ Connection options can be used at the root of the option bag, in the "replicatio
   async close() {
     this.#isClosed = true;
 
-    await this.pool.destroyAllNow();
+    await this.pool!.destroyAllNow();
   }
 
   isClosed() {
@@ -1075,15 +1155,15 @@ Connection options can be used at the root of the option bag, in the "replicatio
       options = { type: 'write', ...optionsOrCallback };
     }
 
-    const connection = await this.pool.acquire(options as GetConnectionOptions);
+    const connection = await this.pool!.acquire(options as GetConnectionOptions);
 
     try {
       return await callback(connection);
     } finally {
       if (options.destroyConnection) {
-        await this.pool.destroy(connection);
+        await this.pool!.destroy(connection);
       } else {
-        this.pool.release(connection);
+        this.pool!.release(connection);
       }
     }
   }

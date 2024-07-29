@@ -77,6 +77,10 @@ export class Transaction {
     return this.#connection;
   }
 
+  get shardId(): string | undefined {
+    return this.options.shardId;
+  }
+
   getConnectionIfExists(): AbstractConnection | undefined {
     return this.#connection;
   }
@@ -171,8 +175,9 @@ export class Transaction {
     if (this.parent) {
       connection = this.parent.#connection;
     } else {
-      connection = await this.sequelize.pool.acquire({
+      connection = await this.sequelize.pool!.acquire({
         type: this.options.readOnly ? 'read' : 'write',
+        shardId: this.options.shardId,
       });
     }
 
@@ -243,7 +248,7 @@ export class Transaction {
       return;
     }
 
-    this.sequelize.pool.release(this.#connection);
+    this.sequelize.pool!.release(this.#connection);
     this.#connection.uuid = undefined;
     this.#connection = undefined;
   }
@@ -266,7 +271,7 @@ export class Transaction {
     const connection = this.#connection;
     this.#connection = undefined;
 
-    await this.sequelize.pool.destroy(connection);
+    await this.sequelize.pool!.destroy(connection);
   }
 
   /**
@@ -573,6 +578,7 @@ export interface TransactionOptions extends Logging {
    * Sets the constraints to be deferred or immediately checked. PostgreSQL only
    */
   constraintChecking?: ConstraintChecking | Class<ConstraintChecking> | undefined;
+  shardId?: string | undefined;
 
   /**
    * Parent transaction.
@@ -587,6 +593,7 @@ export type NormalizedTransactionOptions = StrictRequiredBy<
 > & {
   constraintChecking?: ConstraintChecking | undefined;
   transactionType?: TransactionType | undefined;
+  shardId?: string | undefined;
 };
 
 /**
@@ -621,6 +628,7 @@ export function normalizeTransactionOptions(
       typeof options.constraintChecking === 'function'
         ? new options.constraintChecking()
         : options.constraintChecking,
+    shardId: options.shardId,
   };
 }
 

@@ -10,6 +10,7 @@ import type {
   QueryOptions,
   ReplicationOptions,
   RetryOptions,
+  ShardedReplicationOptions,
   SyncOptions,
 } from './sequelize.js';
 import type { PoolOptions } from './sequelize.types.js';
@@ -20,29 +21,21 @@ export function importDialect(dialect: string): typeof AbstractDialect {
   // require calls static. (Browserify fix)
   switch (dialect) {
     case 'mariadb':
-      // eslint-disable-next-line import/no-extraneous-dependencies -- legacy function, will be removed. User needs to install the dependency themselves
       return require('@sequelize/mariadb').MariaDbDialect;
     case 'mssql':
-      // eslint-disable-next-line import/no-extraneous-dependencies -- legacy function, will be removed. User needs to install the dependency themselves
       return require('@sequelize/mssql').MsSqlDialect;
     case 'mysql':
-      // eslint-disable-next-line import/no-extraneous-dependencies -- legacy function, will be removed. User needs to install the dependency themselves
       return require('@sequelize/mysql').MySqlDialect;
     case 'postgres':
-      // eslint-disable-next-line import/no-extraneous-dependencies -- legacy function, will be removed. User needs to install the dependency themselves
       return require('@sequelize/postgres').PostgresDialect;
     case 'sqlite':
     case 'sqlite3':
-      // eslint-disable-next-line import/no-extraneous-dependencies -- legacy function, will be removed. User needs to install the dependency themselves
       return require('@sequelize/sqlite3').SqliteDialect;
     case 'ibmi':
-      // eslint-disable-next-line import/no-extraneous-dependencies -- legacy function, will be removed. User needs to install the dependency themselves
       return require('@sequelize/db2-ibmi').IBMiDialect;
     case 'db2':
-      // eslint-disable-next-line import/no-extraneous-dependencies -- legacy function, will be removed. User needs to install the dependency themselves
       return require('@sequelize/db2').Db2Dialect;
     case 'snowflake':
-      // eslint-disable-next-line import/no-extraneous-dependencies -- legacy function, will be removed. User needs to install the dependency themselves
       return require('@sequelize/snowflake').SnowflakeDialect;
     default:
       throw new Error(
@@ -71,6 +64,7 @@ export const PERSISTED_SEQUELIZE_OPTIONS = getSynchronizedTypeKeys<
   query: undefined,
   quoteIdentifiers: undefined,
   replication: undefined,
+  sharding: undefined,
   retry: undefined,
   schema: undefined,
   set: undefined,
@@ -197,6 +191,14 @@ export interface PersistedSequelizeOptions<Dialect extends AbstractDialect> exte
    * @default false
    */
   replication?: ReplicationOptions<Dialect> | false | Nullish;
+
+  /**
+   * To enable sharding, pass an array of objects which contains the read and write configuration. Based on the replication options.
+   *
+   * @default false
+   */
+
+  sharding?: ShardedReplicationOptions<Dialect> | false | Nullish;
 
   retry?: RetryOptions;
 
