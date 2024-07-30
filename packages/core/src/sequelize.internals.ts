@@ -21,21 +21,29 @@ export function importDialect(dialect: string): typeof AbstractDialect {
   // require calls static. (Browserify fix)
   switch (dialect) {
     case 'mariadb':
+      // eslint-disable-next-line import/no-extraneous-dependencies -- legacy function, will be removed. User needs to install the dependency themselves
       return require('@sequelize/mariadb').MariaDbDialect;
     case 'mssql':
+      // eslint-disable-next-line import/no-extraneous-dependencies -- legacy function, will be removed. User needs to install the dependency themselves
       return require('@sequelize/mssql').MsSqlDialect;
     case 'mysql':
+      // eslint-disable-next-line import/no-extraneous-dependencies -- legacy function, will be removed. User needs to install the dependency themselves
       return require('@sequelize/mysql').MySqlDialect;
     case 'postgres':
+      // eslint-disable-next-line import/no-extraneous-dependencies -- legacy function, will be removed. User needs to install the dependency themselves
       return require('@sequelize/postgres').PostgresDialect;
     case 'sqlite':
     case 'sqlite3':
+      // eslint-disable-next-line import/no-extraneous-dependencies -- legacy function, will be removed. User needs to install the dependency themselves
       return require('@sequelize/sqlite3').SqliteDialect;
     case 'ibmi':
+      // eslint-disable-next-line import/no-extraneous-dependencies -- legacy function, will be removed. User needs to install the dependency themselves
       return require('@sequelize/db2-ibmi').IBMiDialect;
     case 'db2':
+      // eslint-disable-next-line import/no-extraneous-dependencies -- legacy function, will be removed. User needs to install the dependency themselves
       return require('@sequelize/db2').Db2Dialect;
     case 'snowflake':
+      // eslint-disable-next-line import/no-extraneous-dependencies -- legacy function, will be removed. User needs to install the dependency themselves
       return require('@sequelize/snowflake').SnowflakeDialect;
     default:
       throw new Error(
