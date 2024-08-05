@@ -117,7 +117,7 @@ export class ReplicationPool<Connection extends object, ConnectionOptions extend
   async acquire(options?: AcquireConnectionOptions | undefined) {
     options = options ? shallowClonePojo(options) : pojo();
     await this.beforeAcquire?.(options);
-    Object.freeze(options);
+    // Object.freeze(options);
 
     const { useMaster = false, type = 'write' } = options;
 
