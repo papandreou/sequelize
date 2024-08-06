@@ -47,12 +47,11 @@ export function normalizeShardedReplicationConfig<Dialect extends AbstractDialec
   dialect: Dialect,
   connectionOptions: RawConnectionOptions<Dialect>,
   shardingOptions: PersistedSequelizeOptions<Dialect>['sharding'],
-): NormalizedShardedReplicationOptions<Dialect> {
-  const normalizedShardedReplicationOptions: NormalizedShardedReplicationOptions<Dialect> = {
-    shards: [],
-  };
-
+): NormalizedShardedReplicationOptions<Dialect> | undefined {
   if (shardingOptions && shardingOptions.shards) {
+    const normalizedShardedReplicationOptions: NormalizedShardedReplicationOptions<Dialect> = {
+      shards: [],
+    };
     for (const shard of shardingOptions.shards) {
       const normalizedConnectionOptions = normalizeRawConnectionOptions(dialect, connectionOptions);
       const shardedReplicationOption = {
@@ -70,9 +69,9 @@ export function normalizeShardedReplicationConfig<Dialect extends AbstractDialec
       };
       normalizedShardedReplicationOptions.shards.push(shardedReplicationOption);
     }
-  }
 
-  return normalizedShardedReplicationOptions;
+    return normalizedShardedReplicationOptions;
+  }
 }
 
 function normalizeRawConnectionOptions<Dialect extends AbstractDialect>(

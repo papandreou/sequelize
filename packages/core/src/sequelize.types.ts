@@ -56,5 +56,5 @@ export type NormalizedOptions<Dialect extends AbstractDialect> = StrictRequiredB
   | 'defaultTimestampPrecision'
 > & {
   replication: NormalizedReplicationOptions<Dialect>;
-  sharding: NormalizedShardedReplicationOptions<Dialect>;
+  sharding: NormalizedShardedReplicationOptions<Dialect> | undefined;
 };
