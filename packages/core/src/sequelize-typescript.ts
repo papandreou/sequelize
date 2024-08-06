@@ -679,7 +679,15 @@ Connection options can be used at the root of the option bag, in the "replicatio
 
     if (this.options.sharding) {
       const shards = this.options.sharding.shards.map((shard: any) => {
-        return { shardId: shard.shardId, writeConfig: { ...shard.write }, readConfig: shard.read };
+        return {
+          shardId: shard.shardId,
+          writeConfig: { ...shard.write },
+          readConfig: Array.isArray(shard.read)
+            ? shard.read.map((readConfigEntry: any) => ({
+                ...readConfigEntry,
+              }))
+            : shard.read,
+        };
       });
 
       this.pool = new ShardedReplicationPool<
