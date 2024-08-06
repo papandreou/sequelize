@@ -99,11 +99,12 @@ export class ShardedReplicationPool<
             const nextRead = reads++ % readConfig.length;
             const connectionOptions = readConfig[nextRead];
             connectionOptions.shardId = shardId;
-            const connection = await connect(connectionOptions);
+            const client = await connect(connectionOptions);
 
-            owningPools.set(connection, `read:${shardId}`);
+            // @ts-expect-error -- Property 'connection' does not exist on type 'ShardedConnection'
+            owningPools.set(client.connection, `read:${shardId}`);
 
-            return connection;
+            return client;
           },
           destroy: disconnect,
           validate,
