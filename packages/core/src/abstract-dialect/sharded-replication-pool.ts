@@ -122,12 +122,11 @@ export class ShardedReplicationPool<
         name: 'sequelize:write',
         create: async () => {
           writeConfig.shardId = shardId;
-          const client = await connect(writeConfig);
+          const connection = await connect(writeConfig);
 
-          // @ts-expect-error -- Property 'connection' does not exist on type 'ShardedConnection'
-          owningPools.set(client.connection, `write:${shardId}`);
+          owningPools.set(connection, `write:${shardId}`);
 
-          return client;
+          return connection;
         },
         destroy: disconnect,
         validate,
@@ -164,28 +163,26 @@ export class ShardedReplicationPool<
     return connection;
   }
 
-  release({ connection }: ShardedReplicationPoolReleaseOptions<ShardedConnection>): void {
-    const shardValue = owningPools.get(connection);
+  release(options: ShardedReplicationPoolReleaseOptions<ShardedConnection>): void {
+    const shardValue = owningPools.get(options.connection);
     if (!shardValue) {
       throw new Error('Unable to determine to which sharded pool the connection belongs');
     }
 
     const [shardId, type] = shardValueToTuple(shardValue);
 
-    this.getPool({ shardId, poolType: type, useMaster: false })?.release(connection);
+    this.getPool({ shardId, poolType: type, useMaster: false })?.release(options.connection);
   }
 
-  async destroy({
-    connection,
-  }: ShardedReplicationPoolDestroyOptions<ShardedConnection>): Promise<void> {
-    const shardValue = owningPools.get(connection);
+  async destroy(options: ShardedReplicationPoolDestroyOptions<ShardedConnection>): Promise<void> {
+    const shardValue = owningPools.get(options.connection);
     if (!shardValue) {
       throw new Error('Unable to determine to which sharded pool the connection belongs');
     }
 
     const [shardId, type] = shardValueToTuple(shardValue);
 
-    await this.getPool({ shardId, poolType: type, useMaster: false })?.destroy(connection);
+    await this.getPool({ shardId, poolType: type, useMaster: false })?.destroy(options.connection);
     debug('connection destroy');
   }
 

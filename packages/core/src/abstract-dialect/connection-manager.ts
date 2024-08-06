@@ -30,7 +30,11 @@ export type Connection<
 
 export type ShardedConnection<
   DialectOrConnectionManager extends AbstractDialect | AbstractConnectionManager,
-> = Connection<DialectOrConnectionManager> & ShardedObject;
+> = DialectOrConnectionManager extends AbstractDialect
+  ? Connection<DialectOrConnectionManager['connectionManager']>
+  : DialectOrConnectionManager extends AbstractConnectionManager
+    ? DialectOrConnectionManager[typeof ConnectionType]
+    : never & ShardedObject;
 
 /**
  * Abstract Connection Manager
