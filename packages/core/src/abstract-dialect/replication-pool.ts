@@ -71,11 +71,12 @@ export class ReplicationPool<Connection extends object, ConnectionOptions extend
         create: async () => {
           // round robin config
           const nextRead = reads++ % readConfig.length;
-          const connection = await connect(readConfig[nextRead]);
+          const client = await connect(readConfig[nextRead]);
 
-          owningPools.set(connection, 'read');
+          // @ts-expect-error -- Property 'connection' does not exist on type 'Awaited<Connection>'
+          owningPools.set(client.connection, 'read');
 
-          return connection;
+          return client;
         },
         destroy: disconnect,
         validate,
@@ -91,11 +92,12 @@ export class ReplicationPool<Connection extends object, ConnectionOptions extend
     this.write = new Pool({
       name: 'sequelize:write',
       create: async () => {
-        const connection = await connect(writeConfig);
+        const client = await connect(writeConfig);
 
-        owningPools.set(connection, 'write');
+        // @ts-expect-error -- Property 'connection' does not exist on type 'Awaited<Connection>'
+        owningPools.set(client.connection, 'write');
 
-        return connection;
+        return client;
       },
       destroy: disconnect,
       validate,
