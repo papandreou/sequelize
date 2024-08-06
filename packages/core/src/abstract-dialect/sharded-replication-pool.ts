@@ -122,11 +122,12 @@ export class ShardedReplicationPool<
         name: 'sequelize:write',
         create: async () => {
           writeConfig.shardId = shardId;
-          const connection = await connect(writeConfig);
+          const client = await connect(writeConfig);
 
-          owningPools.set(connection, `write:${shardId}`);
+          // @ts-expect-error -- Property 'connection' does not exist on type 'ShardedConnection'
+          owningPools.set(client.connection, `write:${shardId}`);
 
-          return connection;
+          return client;
         },
         destroy: disconnect,
         validate,
