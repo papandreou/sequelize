@@ -11,7 +11,11 @@ import {
 } from '@sequelize/utils';
 import type { StringKeyOf } from 'type-fest';
 import type { AbstractDialect, ConnectionOptions } from '../abstract-dialect/dialect.js';
-import type { NormalizedReplicationOptions, RawConnectionOptions } from '../sequelize';
+import type {
+  NormalizedReplicationOptions,
+  NormalizedShardedReplicationOptions,
+  RawConnectionOptions,
+} from '../sequelize';
 import type { PersistedSequelizeOptions } from '../sequelize.internals.js';
 
 export function normalizeReplicationConfig<Dialect extends AbstractDialect>(
@@ -37,6 +41,38 @@ export function normalizeReplicationConfig<Dialect extends AbstractDialect>(
           };
         }),
   };
+}
+
+export function normalizeShardedReplicationConfig<Dialect extends AbstractDialect>(
+  dialect: Dialect,
+  connectionOptions: RawConnectionOptions<Dialect>,
+  shardingOptions: PersistedSequelizeOptions<Dialect>['sharding'],
+): NormalizedShardedReplicationOptions<Dialect> {
+  const normalizedShardedReplicationOptions: NormalizedShardedReplicationOptions<Dialect> = {
+    shards: [],
+  };
+
+  if (shardingOptions && shardingOptions.shards) {
+    for (const shard of shardingOptions.shards) {
+      const normalizedConnectionOptions = normalizeRawConnectionOptions(dialect, connectionOptions);
+      const shardedReplicationOption = {
+        shardId: shard.shardId,
+        write: {
+          ...normalizedConnectionOptions,
+          ...(shard.write && normalizeRawConnectionOptions(dialect, shard.write)),
+        },
+        read: shard.read.map(readOptions => {
+          return {
+            ...normalizedConnectionOptions,
+            ...normalizeRawConnectionOptions(dialect, readOptions),
+          };
+        }),
+      };
+      normalizedShardedReplicationOptions.shards.push(shardedReplicationOption);
+    }
+  }
+
+  return normalizedShardedReplicationOptions;
 }
 
 function normalizeRawConnectionOptions<Dialect extends AbstractDialect>(

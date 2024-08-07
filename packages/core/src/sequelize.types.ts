@@ -1,16 +1,19 @@
 import type { PartialOrUndefined, StrictRequiredBy } from '@sequelize/utils';
+import type { ReplicationPoolOptions } from './abstract-dialect/base-replication-pool.js';
 import type { Connection } from './abstract-dialect/connection-manager.js';
 import type {
   AbstractDialect,
   ConnectionOptions,
   DialectOptions,
 } from './abstract-dialect/dialect.js';
-import type { ReplicationPoolOptions } from './abstract-dialect/replication-pool.js';
 import type {
   EphemeralSequelizeOptions,
   PersistedSequelizeOptions,
 } from './sequelize.internals.js';
-import type { NormalizedReplicationOptions } from './sequelize.js';
+import type {
+  NormalizedReplicationOptions,
+  NormalizedShardedReplicationOptions,
+} from './sequelize.js';
 
 /**
  * Connection Pool options.
@@ -53,4 +56,5 @@ export type NormalizedOptions<Dialect extends AbstractDialect> = StrictRequiredB
   | 'defaultTimestampPrecision'
 > & {
   replication: NormalizedReplicationOptions<Dialect>;
+  sharding: NormalizedShardedReplicationOptions<Dialect>;
 };

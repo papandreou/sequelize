@@ -3,6 +3,7 @@ import { DataTypes } from '@sequelize/core';
 import type { SqliteDialect } from '@sequelize/sqlite3';
 import { expect } from 'chai';
 import pick from 'lodash/pick';
+import type { Pool } from 'sequelize-pool';
 import sinon from 'sinon';
 import { CONFIG } from '../config/config';
 import {
@@ -60,8 +61,15 @@ describe(getTestDialectTeaser('Replication'), () => {
       });
 
       await User.sync({ force: true });
-      const readSpy = sandbox.spy(sequelize.pool.read!, 'acquire');
-      const writeSpy = sandbox.spy(sequelize.pool.write, 'acquire');
+
+      const readSpy = sandbox.spy(
+        sequelize.connectionManager.pool.read! as Pool<object>,
+        'acquire',
+      );
+      const writeSpy = sandbox.spy(
+        sequelize.connectionManager.pool.write as Pool<object>,
+        'acquire',
+      );
 
       return {
         User,

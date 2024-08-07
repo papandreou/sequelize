@@ -10,6 +10,7 @@ import type {
   QueryOptions,
   ReplicationOptions,
   RetryOptions,
+  ShardedReplicationOptions,
   SyncOptions,
 } from './sequelize.js';
 import type { PoolOptions } from './sequelize.types.js';
@@ -71,6 +72,7 @@ export const PERSISTED_SEQUELIZE_OPTIONS = getSynchronizedTypeKeys<
   query: undefined,
   quoteIdentifiers: undefined,
   replication: undefined,
+  sharding: undefined,
   retry: undefined,
   schema: undefined,
   set: undefined,
@@ -197,6 +199,14 @@ export interface PersistedSequelizeOptions<Dialect extends AbstractDialect> exte
    * @default false
    */
   replication?: ReplicationOptions<Dialect> | false | Nullish;
+
+  /**
+   * To enable sharding, pass an array of objects which contains the read and write configuration. Based on the replication options.
+   *
+   * @default false
+   */
+
+  sharding?: ShardedReplicationOptions<Dialect> | false | Nullish;
 
   retry?: RetryOptions;
 

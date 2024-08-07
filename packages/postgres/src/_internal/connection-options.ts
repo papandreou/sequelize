@@ -12,6 +12,7 @@ const STRING_CONNECTION_OPTION_MAP = {
   options: undefined,
   password: undefined,
   user: undefined,
+  shardId: undefined,
 } as const satisfies Record<keyof StringConnectionOptions, undefined>;
 
 export const STRING_CONNECTION_OPTION_NAMES = getSynchronizedTypeKeys<StringConnectionOptions>(

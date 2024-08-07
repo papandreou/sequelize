@@ -365,6 +365,7 @@ Use Sequelize#query if you wish to use replacements.`);
           : await this.pool.acquire({
               useMaster: options.useMaster,
               type: options.type === 'SELECT' ? 'read' : 'write',
+              shardId: options.shardId,
             });
 
       if (this.dialect.name === 'db2' && options.alter && options.alter.drop === false) {

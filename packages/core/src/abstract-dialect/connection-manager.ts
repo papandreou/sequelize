@@ -1,4 +1,5 @@
 import type { AbstractDialect, ConnectionOptions } from './dialect.js';
+import type { ShardedObject } from './sharded-replication-pool.js';
 
 export interface GetConnectionOptions {
   /**
@@ -26,6 +27,14 @@ export type Connection<
   : DialectOrConnectionManager extends AbstractConnectionManager
     ? DialectOrConnectionManager[typeof ConnectionType]
     : never;
+
+export type ShardedConnection<
+  DialectOrConnectionManager extends AbstractDialect | AbstractConnectionManager,
+> = DialectOrConnectionManager extends AbstractDialect
+  ? Connection<DialectOrConnectionManager['connectionManager']>
+  : DialectOrConnectionManager extends AbstractConnectionManager
+    ? DialectOrConnectionManager[typeof ConnectionType]
+    : never & ShardedObject;
 
 /**
  * Abstract Connection Manager

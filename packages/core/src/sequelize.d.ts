@@ -81,6 +81,10 @@ export interface ReplicationOptions<Dialect extends AbstractDialect> {
   write?: RawConnectionOptions<Dialect>;
 }
 
+export interface ShardedReplicationOptions<Dialect extends AbstractDialect> {
+  shards: Array<ReplicationOptions<Dialect> & { shardId: string }>;
+}
+
 export type RawConnectionOptions<Dialect extends AbstractDialect> =
   | (ConnectionOptions<Dialect> & { url?: string })
   | string;
@@ -92,6 +96,16 @@ export interface NormalizedReplicationOptions<Dialect extends AbstractDialect> {
    */
   read: ReadonlyArray<ConnectionOptions<Dialect>>;
   write: ConnectionOptions<Dialect>;
+}
+
+export interface NormalizedShardedOption<Dialect extends AbstractDialect> {
+  shardId: string;
+  read: ReadonlyArray<ConnectionOptions<Dialect>>;
+  write: ConnectionOptions<Dialect>;
+}
+
+export interface NormalizedShardedReplicationOptions<Dialect extends AbstractDialect> {
+  shards: Array<NormalizedShardedOption<Dialect>>;
 }
 
 export type DialectName = (typeof SUPPORTED_DIALECTS)[number];
