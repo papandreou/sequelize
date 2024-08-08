@@ -1,5 +1,3 @@
-import assert from 'node:assert';
-import NodeUtils from 'node:util';
 import isArray from 'lodash/isArray';
 import isEmpty from 'lodash/isEmpty';
 import isEqual from 'lodash/isEqual';
@@ -7,6 +5,8 @@ import isPlainObject from 'lodash/isPlainObject.js';
 import lowerFirst from 'lodash/lowerFirst';
 import omit from 'lodash/omit';
 import some from 'lodash/some';
+import assert from 'node:assert';
+import NodeUtils from 'node:util';
 import type { Class } from 'type-fest';
 import { AssociationError } from '../errors/index.js';
 import type { Model, ModelStatic } from '../model';
@@ -16,15 +16,20 @@ import { isModelStatic, isSameInitialModel } from '../utils/model-utils.js';
 import { removeUndefined } from '../utils/object.js';
 import { pluralize, singularize } from '../utils/string.js';
 import type { OmitConstructors } from '../utils/types.js';
-import type { Association, AssociationOptions, ForeignKeyOptions, NormalizedAssociationOptions } from './base';
+import type {
+  Association,
+  AssociationOptions,
+  ForeignKeyOptions,
+  NormalizedAssociationOptions,
+} from './base';
 import type { ThroughOptions } from './belongs-to-many.js';
 
 export function checkNamingCollision(source: ModelStatic<any>, associationName: string): void {
   if (Object.hasOwn(source.getAttributes(), associationName)) {
     throw new Error(
-      `Naming collision between attribute '${associationName}'`
-        + ` and association '${associationName}' on model ${source.name}`
-        + '. To remedy this, change the "as" options in your association definition',
+      `Naming collision between attribute '${associationName}'` +
+        ` and association '${associationName}' on model ${source.name}` +
+        '. To remedy this, change the "as" options in your association definition',
     );
   }
 }
@@ -127,7 +132,7 @@ ${NodeUtils.inspect(omit(options, 'inverse'), { sorted: true })}
 Options of the existing association:
 ${NodeUtils.inspect(omit(existingAssociation.options as any, 'inverse'), { sorted: true })}
 `
-}`.trim(),
+    }`.trim(),
   );
 }
 
@@ -172,7 +177,7 @@ export function assertAssociationModelIsDefined(model: ModelStatic<any>): void {
 }
 
 export type AssociationStatic<T extends Association> = {
-  new (...arguments_: any[]): T,
+  new (...arguments_: any[]): T;
 } & OmitConstructors<typeof Association>;
 
 export function defineAssociation<
@@ -247,10 +252,10 @@ export function defineAssociation<
 }
 
 export type NormalizeBaseAssociationOptions<T> = Omit<T, 'as' | 'hooks' | 'foreignKey'> & {
-  as: string,
-  name: { singular: string, plural: string },
-  hooks: boolean,
-  foreignKey: ForeignKeyOptions<any>,
+  as: string;
+  name: { singular: string; plural: string };
+  hooks: boolean;
+  foreignKey: ForeignKeyOptions<any>;
   // foreignKeys: Array<{ source: string, target: string }>,
 };
 
@@ -288,14 +293,12 @@ export function normalizeBaseAssociationOptions<T extends AssociationOptions<any
 
   // make sure both are not used at the same time
   if (some(options.foreignKey, isEmpty) && some(options.foreignKeys, isEmpty)) {
-    throw new Error(
-      'Only one of "foreignKey" and "foreignKeys" can be defined',
-    );
+    throw new Error('Only one of "foreignKey" and "foreignKeys" can be defined');
   }
 
   const isMultiAssociation = associationType.isMultiAssociation;
 
-  let name: { singular: string, plural: string };
+  let name: { singular: string; plural: string };
   let as: string;
   if (options?.as) {
     if (isPlainObject(options.as)) {
@@ -334,16 +337,18 @@ export function normalizeForeignKeyOptions<T extends string>(
   return typeof foreignKey === 'string'
     ? { name: foreignKey }
     : removeUndefined({
-      ...foreignKey,
-      name: foreignKey?.name ?? foreignKey?.columnName,
-      fieldName: undefined,
-    });
+        ...foreignKey,
+        name: foreignKey?.name ?? foreignKey?.columnName,
+        fieldName: undefined,
+      });
 }
 
 // Update the option normalization logic to turn `foreignKey` and `targetKey` into `foreignKeys`,
-export function normalizeCompositeForeignKeyOptions<T extends string>(options: AssociationOptions<T>): Array<{
-  source: string,
-  target: string,
+export function normalizeCompositeForeignKeyOptions<T extends string>(
+  options: AssociationOptions<T>,
+): Array<{
+  source: string;
+  target: string;
 }> {
   if (isArray(options.foreignKeys) && !some(options.foreignKeys, isEmpty)) {
     return options.foreignKeys.map(fk => {
@@ -361,7 +366,12 @@ export function normalizeCompositeForeignKeyOptions<T extends string>(options: A
   // belongsTo has a targetKey option, which is the name of the column in the target table that the foreign key should reference.
   // hasOne and hasMany have a sourceKey option, which is the name of the column in the source table that the foreign key should reference.
   // belongsToMany has both sourceKey and targetKey, which are the names of the columns in the source and target tables that the foreign key should reference, respectively.
-  return [{ source: sourceKey ?? normalizedForeignKey.name, target: targetKey ?? normalizedForeignKey.name }];
+  return [
+    {
+      source: sourceKey ?? normalizedForeignKey.name,
+      target: targetKey ?? normalizedForeignKey.name,
+    },
+  ];
 }
 
 export type MaybeForwardedModelStatic<M extends Model = Model> =

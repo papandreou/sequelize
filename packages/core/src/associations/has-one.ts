@@ -122,7 +122,8 @@ export class HasOneAssociation<
           as: options.inverse?.as,
           scope: options.inverse?.scope,
           foreignKey: options.foreignKey,
-          foreignKeys: options.foreignKeys,targetKey: options.sourceKey,
+          foreignKeys: options.foreignKeys,
+          targetKey: options.sourceKey,
           foreignKeyConstraints: options.foreignKeyConstraints,
           hooks: options.hooks,
         }),
@@ -248,7 +249,6 @@ If having two associations does not make sense (for instance a "spouse" associat
       for (const key of this.foreignKeys) {
         where[key.target] = instances[0].get(key.source);
       }
-
     } else {
       where[this.foreignKey] = instances[0].get(this.sourceKey);
     }

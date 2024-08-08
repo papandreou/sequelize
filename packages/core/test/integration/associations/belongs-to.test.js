@@ -1020,24 +1020,27 @@ describe(Support.getTestDialectTeaser('BelongsTo'), () => {
               },
               username: DataTypes.STRING,
             });
-            const Address = this.sequelize.define('Address', {
-              addressId: {
-                type: DataTypes.INTEGER,
-                primaryKey: true,
-                autoIncrement: true,
-              },
-              zipCode: DataTypes.STRING,
-            },
-            {
-              indexes: [{ fields: ['zipCode'], name: 'zip_code_index', unique: true }],
-              additionalForeignKeyConstraintDefinitions: [
-                {
-                  columns: ['userId', 'tenantId'],
-                  foreignTable: User,
-                  foreignColumns: ['userId', 'tenantId'],
+            const Address = this.sequelize.define(
+              'Address',
+              {
+                addressId: {
+                  type: DataTypes.INTEGER,
+                  primaryKey: true,
+                  autoIncrement: true,
                 },
-              ],
-            });
+                zipCode: DataTypes.STRING,
+              },
+              {
+                indexes: [{ fields: ['zipCode'], name: 'zip_code_index', unique: true }],
+                additionalForeignKeyConstraintDefinitions: [
+                  {
+                    columns: ['userId', 'tenantId'],
+                    foreignTable: User,
+                    foreignColumns: ['userId', 'tenantId'],
+                  },
+                ],
+              },
+            );
             Address.belongsTo(User, { foreignKeys: ['userId', 'tenantId'] });
 
             await this.sequelize.sync({ force: true });

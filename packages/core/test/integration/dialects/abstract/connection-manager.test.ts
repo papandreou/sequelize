@@ -1,12 +1,10 @@
+import type { Connection } from '@sequelize/core';
+import type { GetConnectionOptions } from '@sequelize/core/_non-semver-use-at-your-own-risk_/dialects/abstract/connection-manager.js';
+import { ReplicationPool } from '@sequelize/core/_non-semver-use-at-your-own-risk_/dialects/abstract/replication-pool.js';
 import chai from 'chai';
 import { Pool } from 'sequelize-pool';
 import type { SinonSandbox } from 'sinon';
 import sinon from 'sinon';
-import type { Connection } from '@sequelize/core';
-import type {
-  GetConnectionOptions,
-} from '@sequelize/core/_non-semver-use-at-your-own-risk_/dialects/abstract/connection-manager.js';
-import { ReplicationPool } from '@sequelize/core/_non-semver-use-at-your-own-risk_/dialects/abstract/replication-pool.js';
 import { Config } from '../../../config/config';
 import {
   createSequelizeInstance,
@@ -65,22 +63,26 @@ describe(getTestDialectTeaser('Connection Manager'), () => {
   });
 
   it('initializes two shards with replication', async () => {
-
     const options = {
       sharding: {
         shards: [
           {
             shardId: 'shard0',
             write: { ...poolEntry, host: 'shard0' },
-            read: [{ ...poolEntry, host: 'shard0-replica0' }, { ...poolEntry, host: 'shard0-replica1' }],
+            read: [
+              { ...poolEntry, host: 'shard0-replica0' },
+              { ...poolEntry, host: 'shard0-replica1' },
+            ],
           },
 
           {
             shardId: 'shard1',
             write: { ...poolEntry, host: 'shard1' },
-            read: [{ ...poolEntry, host: 'shard1-replica0' }, { ...poolEntry, host: 'shard1-replica1' }],
+            read: [
+              { ...poolEntry, host: 'shard1-replica0' },
+              { ...poolEntry, host: 'shard1-replica1' },
+            ],
           },
-
         ],
       },
     };
@@ -101,10 +103,7 @@ describe(getTestDialectTeaser('Connection Manager'), () => {
       shardId: 'shard0',
     };
 
-    const _getConnection = connectionManager.getConnection.bind(
-      connectionManager,
-      queryOptions,
-    );
+    const _getConnection = connectionManager.getConnection.bind(connectionManager, queryOptions);
 
     await _getConnection();
     await _getConnection();
@@ -126,15 +125,20 @@ describe(getTestDialectTeaser('Connection Manager'), () => {
           {
             shardId: 'shard0',
             write: { ...poolEntry, host: 'shard0' },
-            read: [{ ...poolEntry, host: 'shard0-replica0' }, { ...poolEntry, host: 'shard0-replica1' }],
+            read: [
+              { ...poolEntry, host: 'shard0-replica0' },
+              { ...poolEntry, host: 'shard0-replica1' },
+            ],
           },
 
           {
             shardId: 'shard1',
             write: { ...poolEntry, host: 'shard1' },
-            read: [{ ...poolEntry, host: 'shard1-replica0' }, { ...poolEntry, host: 'shard1-replica1' }],
+            read: [
+              { ...poolEntry, host: 'shard1-replica0' },
+              { ...poolEntry, host: 'shard1-replica1' },
+            ],
           },
-
         ],
       },
     };
@@ -155,10 +159,7 @@ describe(getTestDialectTeaser('Connection Manager'), () => {
       shardId: 'shard0',
     };
 
-    const _getConnection = connectionManager.getConnection.bind(
-      connectionManager,
-      queryOptions,
-    );
+    const _getConnection = connectionManager.getConnection.bind(connectionManager, queryOptions);
 
     await _getConnection();
 
@@ -167,7 +168,6 @@ describe(getTestDialectTeaser('Connection Manager'), () => {
     chai.expect(calls[1].args[0].host).to.eql('shard0');
 
     await sequelize.close();
-
   });
 
   it('should round robin calls to the read pool', async () => {
@@ -202,10 +202,7 @@ describe(getTestDialectTeaser('Connection Manager'), () => {
       useMaster: false,
     };
 
-    const _getConnection = connectionManager.getConnection.bind(
-      connectionManager,
-      queryOptions,
-    );
+    const _getConnection = connectionManager.getConnection.bind(connectionManager, queryOptions);
 
     await _getConnection();
     await _getConnection();
@@ -282,9 +279,7 @@ describe(getTestDialectTeaser('Connection Manager'), () => {
       sandbox.stub(connectionManager, '_disconnect').resolves();
       sandbox.stub(connectionManager, '_onProcessExit');
 
-      sandbox
-        .stub(sequelize, 'fetchDatabaseVersion')
-        .resolves(sequelize.dialect.defaultVersion);
+      sandbox.stub(sequelize, 'fetchDatabaseVersion').resolves(sequelize.dialect.defaultVersion);
 
       const queryOptions: GetConnectionOptions = {
         type: 'read',

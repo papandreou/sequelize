@@ -920,7 +920,9 @@ ${associationOwner._getAssociationDebugList()}`);
 
           const currentAttribute = columnDefs[columnName];
           if (!currentAttribute) {
-            const foreignKeyConstraints = foreignKeyReferences.filter(fk => fk.columnNames.includes(columnName));
+            const foreignKeyConstraints = foreignKeyReferences.filter(fk =>
+              fk.columnNames.includes(columnName),
+            );
             for (const fk of foreignKeyConstraints) {
               if (!removedConstraints[fk.constraintName]) {
                 await this.queryInterface.removeConstraint(tableName, fk.constraintName, options);
@@ -978,7 +980,12 @@ ${associationOwner._getAssociationDebugList()}`);
         }
 
         if (!columns[columnName] && !columns[physicalAttributes[columnName].field]) {
-          await this.queryInterface.addColumn(tableName, physicalAttributes[columnName].field || columnName, physicalAttributes[columnName], options);
+          await this.queryInterface.addColumn(
+            tableName,
+            physicalAttributes[columnName].field || columnName,
+            physicalAttributes[columnName],
+            options,
+          );
         }
       }
     }
@@ -1006,10 +1013,15 @@ ${associationOwner._getAssociationDebugList()}`);
       await this.queryInterface.addIndex(tableName, index, options);
     }
 
-    const existingConstraints = await this.queryInterface.showConstraints(tableName, { ...options, constraintType: 'FOREIGN KEY' });
+    const existingConstraints = await this.queryInterface.showConstraints(tableName, {
+      ...options,
+      constraintType: 'FOREIGN KEY',
+    });
 
     for (const fkConstraint of options.additionalForeignKeyConstraintDefinitions || []) {
-      const constraintName = fkConstraint.name ?? `${tableName.tableName}_${fkConstraint.columns.join('_')}_${fkConstraint.foreignTable.tableName}_${fkConstraint.foreignColumns.join('_')}_cfkey`;
+      const constraintName =
+        fkConstraint.name ??
+        `${tableName.tableName}_${fkConstraint.columns.join('_')}_${fkConstraint.foreignTable.tableName}_${fkConstraint.foreignColumns.join('_')}_cfkey`;
 
       if (!existingConstraints.some(constraint => constraint.constraintName === constraintName)) {
         await this.queryInterface.addConstraint(tableName.tableName, {

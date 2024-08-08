@@ -173,13 +173,8 @@ export function setTransactionFromCls(options: Transactionable, sequelize: Seque
     const clsTransaction = sequelize.getCurrentClsTransaction();
 
     if (clsTransaction) {
-      if (
-        'shardId' in options
-        && clsTransaction.options.shardId !== options.shardId
-      ) {
-        throw new Error(
-          'The shardId in the query option and in the transaction does not match',
-        );
+      if ('shardId' in options && clsTransaction.options.shardId !== options.shardId) {
+        throw new Error('The shardId in the query option and in the transaction does not match');
       }
 
       options.transaction = clsTransaction;

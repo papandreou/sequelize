@@ -319,7 +319,7 @@ export interface AssociationOptions<ForeignKey extends string = string> extends 
    */
   foreignKey?: ForeignKey | ForeignKeyOptions<ForeignKey>;
 
-  foreignKeys?: ForeignKey[] | Array<{ source: string, target: string }>;
+  foreignKeys?: ForeignKey[] | Array<{ source: string; target: string }>;
 
   /**
    * Should ON UPDATE, ON DELETE, and REFERENCES constraints be enabled on the foreign key.
