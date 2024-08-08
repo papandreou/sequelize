@@ -1,7 +1,10 @@
+import isArray from 'lodash/isArray';
+import isEmpty from 'lodash/isEmpty';
 import isEqual from 'lodash/isEqual';
 import isPlainObject from 'lodash/isPlainObject.js';
 import lowerFirst from 'lodash/lowerFirst';
 import omit from 'lodash/omit';
+import some from 'lodash/some';
 import assert from 'node:assert';
 import NodeUtils from 'node:util';
 import type { Class } from 'type-fest';
@@ -156,8 +159,8 @@ function getAssociationsIncompatibilityStatus(
     return IncompatibilityStatus.DIFFERENT_TARGETS;
   }
 
-  const opts1 = omit(existingAssociation.options as any, 'inverse');
-  const opts2 = omit(newOptions, 'inverse');
+  const opts1 = omit(existingAssociation.options as any, 'inverse', 'foreignKeys');
+  const opts2 = omit(newOptions, 'inverse', 'foreignKeys');
   if (!isEqual(opts1, opts2)) {
     return IncompatibilityStatus.DIFFERENT_OPTIONS;
   }
@@ -253,6 +256,7 @@ export type NormalizeBaseAssociationOptions<T> = Omit<T, 'as' | 'hooks' | 'forei
   name: { singular: string; plural: string };
   hooks: boolean;
   foreignKey: ForeignKeyOptions<any>;
+  // foreignKeys: Array<{ source: string, target: string }>,
 };
 
 export function normalizeInverseAssociation<T extends { as?: unknown }>(
@@ -287,6 +291,11 @@ export function normalizeBaseAssociationOptions<T extends AssociationOptions<any
     );
   }
 
+  // make sure both are not used at the same time
+  if (some(options.foreignKey, isEmpty) && some(options.foreignKeys, isEmpty)) {
+    throw new Error('Only one of "foreignKey" and "foreignKeys" can be defined');
+  }
+
   const isMultiAssociation = associationType.isMultiAssociation;
 
   let name: { singular: string; plural: string };
@@ -315,6 +324,7 @@ export function normalizeBaseAssociationOptions<T extends AssociationOptions<any
   return removeUndefined({
     ...options,
     foreignKey: normalizeForeignKeyOptions(options.foreignKey),
+    foreignKeys: normalizeCompositeForeignKeyOptions(options),
     hooks: options.hooks ?? false,
     as,
     name,
@@ -328,9 +338,40 @@ export function normalizeForeignKeyOptions<T extends string>(
     ? { name: foreignKey }
     : removeUndefined({
         ...foreignKey,
-        name: foreignKey?.name ?? foreignKey?.fieldName,
+        name: foreignKey?.name ?? foreignKey?.columnName,
         fieldName: undefined,
       });
+}
+
+// Update the option normalization logic to turn `foreignKey` and `targetKey` into `foreignKeys`,
+export function normalizeCompositeForeignKeyOptions<T extends string>(
+  options: AssociationOptions<T>,
+): Array<{
+  source: string;
+  target: string;
+}> {
+  if (isArray(options.foreignKeys) && !some(options.foreignKeys, isEmpty)) {
+    return options.foreignKeys.map(fk => {
+      return typeof fk === 'string' ? { source: fk, target: fk } : fk;
+    });
+  }
+
+  const normalizedForeignKey = normalizeForeignKeyOptions(options.foreignKey);
+
+  const { targetKey, sourceKey } = options as any;
+  if (some(normalizedForeignKey, isEmpty) || normalizedForeignKey.name === undefined) {
+    return [];
+  }
+
+  // belongsTo has a targetKey option, which is the name of the column in the target table that the foreign key should reference.
+  // hasOne and hasMany have a sourceKey option, which is the name of the column in the source table that the foreign key should reference.
+  // belongsToMany has both sourceKey and targetKey, which are the names of the columns in the source and target tables that the foreign key should reference, respectively.
+  return [
+    {
+      source: sourceKey ?? normalizedForeignKey.name,
+      target: targetKey ?? normalizedForeignKey.name,
+    },
+  ];
 }
 
 export type MaybeForwardedModelStatic<M extends Model = Model> =
