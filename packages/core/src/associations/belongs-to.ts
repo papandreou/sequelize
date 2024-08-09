@@ -113,13 +113,13 @@ export class BelongsToAssociation<
     parent?: Association,
   ) {
     const isForeignKeyEmpty = isEmpty(options.foreignKey);
-    const isForeignKeysValid = Array.isArray(options.foreignKeys)
-      && options.foreignKeys.length > 0
-      && options.foreignKeys.every(fk => !isEmpty(fk));
+    const isForeignKeysValid = Array.isArray(options.foreignKey.keys)
+      && options.foreignKey.keys.length > 0
+      && options.foreignKey.keys.every(fk => !isEmpty(fk));
 
     let targetKeys;
     if (isForeignKeyEmpty && isForeignKeysValid) {
-      targetKeys = (options.foreignKeys as Array<{ source: SourceKey, target: TargetKey }>).map(fk => fk.target);
+      targetKeys = (options.foreignKey.keys as Array<{ source: SourceKey, target: TargetKey }>).map(fk => fk.target);
     } else {
       targetKeys = options?.targetKey
       ? [options.targetKey]
@@ -144,11 +144,10 @@ export class BelongsToAssociation<
 
     super(secret, source, target, options, parent);
     this.isCompositeKey = this.targetKeys.length > 1;
-    this.setupTargetKeys(options, target);
-
+    this.targetKeys = Array.isArray(targetKeys) ? targetKeys : [...targetKeys].map(key => key as TargetKey);
     const shouldHashPrimaryKey = this.shouldHashPrimaryKey(targetAttributes);
 
-    if ((!isEmpty(options.foreignKeys) && isEmpty(options.foreignKey)) && !shouldHashPrimaryKey) {
+    if ((!isEmpty(options.foreignKey.keys) && isEmpty(options.foreignKey)) && !shouldHashPrimaryKey) {
 
       // Composite key flow
       // TODO: fix this
@@ -156,7 +155,7 @@ export class BelongsToAssociation<
       this.foreignKey = null as any;
       this.identifierField = null as any;
 
-      this.foreignKeys = options.foreignKeys as Array<{ source: SourceKey, target: TargetKey }>;
+      this.foreignKeys = options.foreignKey.keys as Array<{ source: SourceKey, target: TargetKey }>;
 
       for (const targetKey of this.targetKeys) {
         const targetColumn = targetAttributes.get(targetKey)!;
@@ -298,31 +297,6 @@ export class BelongsToAssociation<
           );
       }
     }
-  }
-
-  private setupTargetKeys(options: NormalizedBelongsToOptions<SourceKey, TargetKey>, target: ModelStatic<T>) {
-    const isForeignKeyEmpty = isEmpty(options.foreignKey);
-    const isForeignKeysValid = Array.isArray(options.foreignKeys)
-      && options.foreignKeys.length > 0
-      && options.foreignKeys.every(fk => !isEmpty(fk));
-
-    let targetKeys;
-    if (isForeignKeyEmpty && isForeignKeysValid) {
-      targetKeys = (options.foreignKeys as Array<{ source: SourceKey, target: TargetKey }>).map(fk => fk.target);
-    } else {
-      targetKeys = options?.targetKey
-        ? [options.targetKey]
-        : target.modelDefinition.primaryKeysAttributeNames;
-    }
-
-    const targetAttributes = target.modelDefinition.attributes;
-    for (const key of targetKeys) {
-      if (!targetAttributes.has(key)) {
-        throw new Error(`Unknown attribute "${key}" passed as targetKey, define this attribute on model "${target.name}" first`);
-      }
-    }
-
-    this.targetKeys = Array.isArray(targetKeys) ? targetKeys : [...targetKeys].map(key => key as TargetKey);
   }
 
   /**

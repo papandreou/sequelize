@@ -839,6 +839,13 @@ ${associationOwner._getAssociationDebugList()}`);
     const physicalAttributes = getObjectFromMap(modelDefinition.physicalAttributes);
     const columnDefs = getObjectFromMap(modelDefinition.columns);
 
+    console.log('modelDefinition', modelDefinition);
+    console.log('modelDefinition.associations', modelDefinition.associations);
+    console.log('modelDefinition.associations', JSON.stringify(modelDefinition.associations, null , 2));
+    console.log('physicalAttributes', physicalAttributes);
+    console.log('columnDefs', columnDefs);
+
+
     if (options.hooks) {
       await this.hooks.runAsync('beforeSync', options);
     }
