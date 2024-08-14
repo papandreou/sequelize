@@ -920,6 +920,16 @@ ${associationOwner._getAssociationDebugList()}`);
 
           const currentAttribute = columnDefs[columnName];
           if (!currentAttribute) {
+            const foreignKeyConstraints = foreignKeyReferences.filter(fk =>
+              fk.columnNames.includes(columnName),
+            );
+            for (const fk of foreignKeyConstraints) {
+              if (!removedConstraints[fk.constraintName]) {
+                await this.queryInterface.removeConstraint(tableName, fk.constraintName, options);
+                removedConstraints[fk.constraintName] = true;
+              }
+            }
+
             await this.queryInterface.removeColumn(tableName, columnName, options);
             continue;
           }
@@ -963,6 +973,21 @@ ${associationOwner._getAssociationDebugList()}`);
           await this.queryInterface.changeColumn(tableName, columnName, currentAttribute, options);
         }
       }
+
+      for (const columnName in physicalAttributes) {
+        if (Object.hasOwn(physicalAttributes, columnName)) {
+          continue;
+        }
+
+        if (!columns[columnName] && !columns[physicalAttributes[columnName].field]) {
+          await this.queryInterface.addColumn(
+            tableName,
+            physicalAttributes[columnName].field || columnName,
+            physicalAttributes[columnName],
+            options,
+          );
+        }
+      }
     }
 
     const existingIndexes = await this.queryInterface.showIndex(tableName, options);
@@ -986,6 +1011,40 @@ ${associationOwner._getAssociationDebugList()}`);
     for (const index of missingIndexes) {
       // TODO: 'options' is ignored by addIndex, making Add Index queries impossible to log.
       await this.queryInterface.addIndex(tableName, index, options);
+    }
+
+    const existingConstraints = await this.queryInterface.showConstraints(tableName, {
+      ...options,
+      constraintType: 'FOREIGN KEY',
+    });
+
+    const associations = Object.values(this.modelDefinition.associations)
+      .filter(association => {
+        return association.options?.foreignKey?.keys?.length > 0;
+      })
+      .filter(association => {
+        return association.associationType !== 'HasOne';
+      });
+
+    for (const association of associations) {
+      const foreignKey = association.options.foreignKey;
+      const sourceKeyFields = foreignKey.keys.map(k => k.sourceKey);
+      const targetKeyFields = foreignKey.keys.map(k => k.targetKey);
+
+      const constraintName = `${tableName.tableName}_${sourceKeyFields.join('_')}_${association.target.modelDefinition.table.tableName}_${targetKeyFields.join('_')}_cfkey`;
+      if (!existingConstraints.some(constraint => constraint.constraintName === constraintName)) {
+        await this.queryInterface.addConstraint(tableName.tableName, {
+          fields: sourceKeyFields,
+          type: 'FOREIGN KEY',
+          name: constraintName,
+          references: {
+            table: association.target.modelDefinition.table,
+            fields: targetKeyFields,
+          },
+          onDelete: foreignKey.onDelete,
+          onUpdate: foreignKey.onUpdate,
+        });
+      }
     }
 
     if (options.hooks) {
