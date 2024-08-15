@@ -79,6 +79,24 @@ describe('QueryGenerator#generateJoin', () => {
       },
     );
 
+    const CompanyCar = sequelize.define(
+      'CompanyCar',
+      {
+        name: DataTypes.STRING,
+        carId: {
+          type: DataTypes.INTEGER,
+          field: 'car_id',
+          primaryKey: true,
+        },
+        secondaryCarId: {
+          type: DataTypes.STRING,
+          field: 'secondaryCar_id',
+          primaryKey: true,
+        },
+      },
+      { tableName: 'company_car' },
+    );
+
     const Profession = sequelize.define(
       'Profession',
       {
@@ -103,6 +121,11 @@ describe('QueryGenerator#generateJoin', () => {
       inverse: 'Company',
     });
     Company.Owner = Company.belongsTo(User, { as: 'Owner', foreignKey: 'ownerId' });
+
+    User.CompanyCar = User.belongsTo(CompanyCar, {
+      as: 'CompanyCar',
+      foreignKey: { keys: ['carId', 'secondaryCarId'] },
+    });
 
     return { User, Task, Company, Profession };
   });
