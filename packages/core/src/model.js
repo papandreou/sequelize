@@ -1604,9 +1604,13 @@ ${associationOwner._getAssociationDebugList()}`);
         });
 
         for (const result of results) {
-          result.set(include.association.as, map.get(result.get(include.association.sourceKey)), {
-            raw: true,
-          });
+          result.set(
+            include.association.as,
+            map.get(`${result.get(include.association.sourceKey)}`),
+            {
+              raw: true,
+            },
+          );
         }
       }),
     );

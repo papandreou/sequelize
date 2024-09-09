@@ -1207,12 +1207,14 @@ export class AbstractQueryGenerator extends AbstractQueryGeneratorTypeScript {
         ).replace(/;$/, '')}) AS sub`; // Every derived table must have its own alias
         const splicePos = baseQuery.indexOf(placeholder);
 
+        const valueIndex = options.groupedLimit.values ? 'values' : whereKey;
+
         mainQueryItems.push(
           this.selectFromTableFragment(
             options,
             mainTable.model,
             attributes.main,
-            `(${options.groupedLimit.values
+            `(${options.groupedLimit[valueIndex]
               .map(value => {
                 let groupWhere;
                 if (whereKey) {
