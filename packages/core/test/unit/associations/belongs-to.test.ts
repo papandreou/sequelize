@@ -293,5 +293,25 @@ describe(getTestDialectTeaser('belongsTo'), () => {
       expect(Tasks.getAttributes().projectId.allowNull).to.be.false;
       expect(Tasks.getAttributes().tenantId.allowNull).to.be.false;
     });
+
+    it('should add attributes to columns when they are not named the same', () => {
+      Tasks.belongsTo(Projects, {
+        foreignKey: {
+          keys: [
+            {
+              sourceKey: 'projectIdentifier',
+              targetKey: 'projectId',
+            },
+            {
+              sourceKey: 'tenantIdentifier',
+              targetKey: 'tenantId',
+            },
+          ],
+        },
+        hooks: false,
+      });
+      expect(Tasks.getAttributes().projectIdentifier).to.not.be.undefined;
+      expect(Tasks.getAttributes().tenantIdentifier).to.not.be.undefined;
+    });
   });
 });
