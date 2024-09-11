@@ -176,7 +176,7 @@ export class BelongsToAssociation<
         const newForeignKeyAttribute: any = removeUndefined({
           type: cloneDataType(targetColumn.type),
           name: sourceKey,
-          allowNull: Boolean(foreignKeyAttributeOptions?.allowNull),
+          allowNull: foreignKeyAttributeOptions?.allowNull,
         });
         this.source.mergeAttributesDefault({
           [sourceKey]: newForeignKeyAttribute,
