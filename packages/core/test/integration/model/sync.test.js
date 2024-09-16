@@ -191,7 +191,7 @@ describe(getTestDialectTeaser('Model.sync & Sequelize#sync'), () => {
     const constraint = constraints.find(
       c =>
         c.constraintType === 'FOREIGN KEY' &&
-        c.constraintName === 'Addresses_userId_tenantId_Users_userId_tenantId_cfkey',
+        c.constraintName === 'Addresses_userId_tenantId_Users_userId_tenantId_fkey',
     );
     expect(constraint.columnNames).to.deep.eq(['userId', 'tenantId']);
     expect(constraint.referencedColumnNames).to.deep.eq(['userId', 'tenantId']);
@@ -226,7 +226,7 @@ describe(getTestDialectTeaser('Model.sync & Sequelize#sync'), () => {
     const constraint = constraints.find(
       c =>
         c.constraintType === 'FOREIGN KEY' &&
-        c.constraintName === 'Addresses_userId_tenantId_Users_userId_tenantId_cfkey',
+        c.constraintName === 'Addresses_userId_tenantId_Users_userId_tenantId_fkey',
     );
     expect(constraint).to.exist;
   });
@@ -267,7 +267,7 @@ describe(getTestDialectTeaser('Model.sync & Sequelize#sync'), () => {
     const constraint = constraints.find(
       c =>
         c.constraintType === 'FOREIGN KEY' &&
-        c.constraintName === 'Addresses_userId_tenantId_Users_userId_tenantId_cfkey',
+        c.constraintName === 'Addresses_userId_tenantId_Users_userId_tenantId_fkey',
     );
     expect(constraint).to.exist;
   });
@@ -337,7 +337,7 @@ describe(getTestDialectTeaser('Model.sync & Sequelize#sync'), () => {
     const constraint = constraints.find(
       c =>
         c.constraintType === 'FOREIGN KEY' &&
-        c.constraintName === 'Addresses_userId_tenantId_Users_userId_tenantId_cfkey',
+        c.constraintName === 'Addresses_userId_tenantId_Users_userId_tenantId_fkey',
     );
     expect(constraint).to.exist;
   });

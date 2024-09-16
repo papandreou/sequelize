@@ -1031,7 +1031,7 @@ ${associationOwner._getAssociationDebugList()}`);
       const sourceKeyFields = foreignKey.keys.map(k => k.sourceKey);
       const targetKeyFields = foreignKey.keys.map(k => k.targetKey);
 
-      const constraintName = `${tableName.tableName}_${sourceKeyFields.join('_')}_${association.target.modelDefinition.table.tableName}_${targetKeyFields.join('_')}_cfkey`;
+      const constraintName = `${tableName.tableName}_${sourceKeyFields.join('_')}_${association.target.modelDefinition.table.tableName}_${targetKeyFields.join('_')}_fkey`;
       if (!existingConstraints.some(constraint => constraint.constraintName === constraintName)) {
         await this.queryInterface.addConstraint(tableName.tableName, {
           fields: sourceKeyFields,
