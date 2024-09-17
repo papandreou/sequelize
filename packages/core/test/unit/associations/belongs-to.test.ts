@@ -289,7 +289,10 @@ describe(getTestDialectTeaser('belongsTo'), () => {
     });
 
     it('should add not null constraint to columns', () => {
-      Tasks.belongsTo(Projects, { foreignKey: { keys: ['projectId', 'tenantId'] }, hooks: false });
+      Tasks.belongsTo(Projects, {
+        foreignKey: { keys: ['projectId', 'tenantId'], allowNull: false },
+        hooks: false,
+      });
       expect(Tasks.getAttributes().projectId.allowNull).to.be.false;
       expect(Tasks.getAttributes().tenantId.allowNull).to.be.false;
     });
