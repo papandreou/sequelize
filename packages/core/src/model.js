@@ -1608,14 +1608,36 @@ ${associationOwner._getAssociationDebugList()}`);
           ...omit(include, ['parent', 'association', 'as', 'originalAttributes']),
         });
 
+        const mapKeys = map.keys();
+
+        // TODO: maybe use some other approach to add composite-keys to the map and check
+        let isComposite = false;
+        for (const key of mapKeys) {
+          if (key.includes('&')) {
+            isComposite = true;
+            break;
+          }
+        }
+
         for (const result of results) {
-          result.set(
-            include.association.as,
-            map.get(`${result.get(include.association.sourceKey)}`),
-            {
-              raw: true,
-            },
-          );
+          if (isComposite) {
+            const mapKeyValues = [];
+            const fKeys = include.association.foreignKeys;
+            for (const fKey of fKeys) {
+              mapKeyValues.push(result[fKey.sourceKey]);
+            }
+
+            const mapKey = mapKeyValues.join('&');
+            result.set(include.association.as, map.get(mapKey), { raw: true });
+          } else {
+            result.set(
+              include.association.as,
+              map.get(`${result.get(include.association.sourceKey)}`),
+              {
+                raw: true,
+              },
+            );
+          }
         }
       }),
     );
