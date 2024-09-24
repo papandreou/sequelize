@@ -705,7 +705,8 @@ ${associationOwner._getAssociationDebugList()}`);
       if (
         options.attributes &&
         options.attributes.length > 0 &&
-        !flattenDepth(options.attributes, 2).includes(association.sourceKey)
+        !flattenDepth(options.attributes, 2).includes(association.sourceKey) &&
+        association.sourceKey !== null
       ) {
         options.attributes.push(association.sourceKey);
       }
@@ -713,7 +714,8 @@ ${associationOwner._getAssociationDebugList()}`);
       if (
         include.attributes &&
         include.attributes.length > 0 &&
-        !flattenDepth(include.attributes, 2).includes(association.foreignKey)
+        !flattenDepth(include.attributes, 2).includes(association.foreignKey) &&
+        association.foreignKey !== null
       ) {
         include.attributes.push(association.foreignKey);
       }
