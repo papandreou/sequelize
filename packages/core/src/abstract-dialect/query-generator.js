@@ -1129,7 +1129,7 @@ export class AbstractQueryGenerator extends AbstractQueryGeneratorTypeScript {
           whereKey = options.groupedLimit.on;
         } else if (options.groupedLimit.on instanceof HasManyAssociation) {
           // TODO: revisit this whether we still need this or not
-          // eslint-disable-next-line no-unused-vars
+
           whereKey = options.groupedLimit.on.identifierField;
         }
 
@@ -1210,45 +1210,67 @@ export class AbstractQueryGenerator extends AbstractQueryGeneratorTypeScript {
         ).replace(/;$/, '')}) AS sub`; // Every derived table must have its own alias
         const splicePos = baseQuery.indexOf(placeholder);
 
-        const valueKeys = Object.keys(omit(options.groupedLimit, ['on', 'should', 'limit']));
+        let tablesStr;
+        if (options.groupedLimit.values && Array.isArray(options.groupedLimit.values)) {
+          tablesStr = `(${options.groupedLimit.values
+            .map(value => {
+              let groupWhere;
+              if (whereKey) {
+                groupWhere = {
+                  [whereKey]: value,
+                };
+              }
 
-        // TODO: check if all the arrays have the same length
-        const firstLength = options.groupedLimit[valueKeys[0]].length;
-        const whereSplices = [];
-        for (let i = 0; i < firstLength; i++) {
-          const groupWhere = {};
-          for (const key of valueKeys) {
-            groupWhere[key] = options.groupedLimit[key][i];
+              if (include) {
+                groupWhere = {
+                  [options.groupedLimit.on.foreignIdentifierField]: value,
+                };
+              }
 
-            if (include) {
-              groupWhere[options.groupedLimit.on.foreignIdentifierField] =
-                options.groupedLimit[key][i];
+              return spliceStr(
+                baseQuery,
+                splicePos,
+                placeholder.length,
+                this.whereItemsQuery(groupWhere, { ...options, mainAlias: groupedTableName }),
+              );
+            })
+            .join(this.dialect.supports['UNION ALL'] ? ' UNION ALL ' : ' UNION ')})`;
+        } else {
+          const valueKeys = Object.keys(omit(options.groupedLimit, ['on', 'should', 'limit']));
+
+          // TODO: check if all the arrays have the same length
+          const firstLength = options.groupedLimit[valueKeys[0]].length;
+          const whereSplices = [];
+          for (let i = 0; i < firstLength; i++) {
+            const groupWhere = {};
+            for (const key of valueKeys) {
+              groupWhere[key] = options.groupedLimit[key][i];
+
+              whereSplices.push(
+                spliceStr(
+                  baseQuery,
+                  splicePos,
+                  placeholder.length,
+                  this.whereItemsQuery(
+                    { [Op.and]: groupWhere },
+                    { ...options, mainAlias: groupedTableName },
+                  ),
+                ),
+              );
             }
+
+            tablesStr = `(${whereSplices.join(
+              this.dialect.supports['UNION ALL'] ? ' UNION ALL ' : ' UNION ',
+            )})`;
           }
-
-          whereSplices.push(
-            spliceStr(
-              baseQuery,
-              splicePos,
-              placeholder.length,
-              this.whereItemsQuery(
-                { [Op.and]: groupWhere },
-                { ...options, mainAlias: groupedTableName },
-              ),
-            ),
-          );
         }
-
-        const tables = `(${whereSplices.join(
-          this.dialect.supports['UNION ALL'] ? ' UNION ALL ' : ' UNION ',
-        )})`;
 
         mainQueryItems.push(
           this.selectFromTableFragment(
             options,
             mainTable.model,
             attributes.main,
-            tables,
+            tablesStr,
             mainTable.quotedAs,
           ),
         );
