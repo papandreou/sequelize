@@ -705,7 +705,8 @@ ${associationOwner._getAssociationDebugList()}`);
       if (
         options.attributes &&
         options.attributes.length > 0 &&
-        !flattenDepth(options.attributes, 2).includes(association.sourceKey)
+        !flattenDepth(options.attributes, 2).includes(association.sourceKey) &&
+        association.sourceKey !== null
       ) {
         options.attributes.push(association.sourceKey);
       }
@@ -713,7 +714,8 @@ ${associationOwner._getAssociationDebugList()}`);
       if (
         include.attributes &&
         include.attributes.length > 0 &&
-        !flattenDepth(include.attributes, 2).includes(association.foreignKey)
+        !flattenDepth(include.attributes, 2).includes(association.foreignKey) &&
+        association.foreignKey !== null
       ) {
         include.attributes.push(association.foreignKey);
       }
@@ -1030,8 +1032,11 @@ ${associationOwner._getAssociationDebugList()}`);
       const foreignKey = association.options.foreignKey;
       const sourceKeyFields = foreignKey.keys.map(k => k.sourceKey);
       const targetKeyFields = foreignKey.keys.map(k => k.targetKey);
+      const modelKeysMatch = isEqual(sourceKeyFields, targetKeyFields);
+      const constraintName = modelKeysMatch
+        ? `${tableName.tableName}_${sourceKeyFields.join('_')}_fkey`
+        : `${tableName.tableName}_${sourceKeyFields.join('_')}_${association.target.modelDefinition.table.tableName}_${targetKeyFields.join('_')}_fkey`;
 
-      const constraintName = `${tableName.tableName}_${sourceKeyFields.join('_')}_${association.target.modelDefinition.table.tableName}_${targetKeyFields.join('_')}_cfkey`;
       if (!existingConstraints.some(constraint => constraint.constraintName === constraintName)) {
         await this.queryInterface.addConstraint(tableName.tableName, {
           fields: sourceKeyFields,
@@ -1603,10 +1608,36 @@ ${associationOwner._getAssociationDebugList()}`);
           ...omit(include, ['parent', 'association', 'as', 'originalAttributes']),
         });
 
+        const mapKeys = map.keys();
+
+        // TODO: maybe use some other approach to add composite-keys to the map and check
+        let isComposite = false;
+        for (const key of mapKeys) {
+          if (key.includes('&')) {
+            isComposite = true;
+            break;
+          }
+        }
+
         for (const result of results) {
-          result.set(include.association.as, map.get(result.get(include.association.sourceKey)), {
-            raw: true,
-          });
+          if (isComposite) {
+            const mapKeyValues = [];
+            const fKeys = include.association.foreignKeys;
+            for (const fKey of fKeys) {
+              mapKeyValues.push(result[fKey.sourceKey]);
+            }
+
+            const mapKey = mapKeyValues.join('&');
+            result.set(include.association.as, map.get(mapKey), { raw: true });
+          } else {
+            result.set(
+              include.association.as,
+              map.get(`${result.get(include.association.sourceKey)}`),
+              {
+                raw: true,
+              },
+            );
+          }
         }
       }),
     );

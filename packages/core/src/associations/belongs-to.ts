@@ -168,18 +168,18 @@ export class BelongsToAssociation<
       this.foreignKey = null as any;
       this.identifierField = null as any;
 
-      this.foreignKeys = options.foreignKey.keys as CompositeForeignKeysOptions[];
+      const foreignKeyAttributeOptions = options.foreignKey;
+      this.foreignKeys = foreignKeyAttributeOptions.keys as CompositeForeignKeysOptions[];
 
-      for (const targetKey of this.targetKeys) {
+      for (const { sourceKey, targetKey } of this.foreignKeys) {
         const targetColumn = targetAttributes.get(targetKey)!;
-        const referencedColumn = source.modelDefinition.rawAttributes[targetColumn.columnName];
         const newForeignKeyAttribute: any = removeUndefined({
           type: cloneDataType(targetColumn.type),
-          name: targetColumn.columnName,
-          allowNull: Boolean(referencedColumn?.allowNull),
+          name: sourceKey,
+          allowNull: foreignKeyAttributeOptions?.allowNull,
         });
         this.source.mergeAttributesDefault({
-          [targetColumn.columnName]: newForeignKeyAttribute,
+          [sourceKey]: newForeignKeyAttribute,
         });
       }
     } else {
