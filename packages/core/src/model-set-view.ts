@@ -67,15 +67,11 @@ export class ModelSetView<Dialect extends AbstractDialect> extends SetView<Model
       const { attributes, associations } = model.modelDefinition;
 
       for (const association of Object.values(associations).filter(
-        a => a.parentAssociation !== null,
+        a => a.associationType === 'BelongsTo',
       )) {
-        if (!association.parentAssociation) {
-          continue;
-        }
-
         if (
-          !isEmpty(association.parentAssociation.options.foreignKey) &&
-          Array.isArray(association.parentAssociation.options.foreignKey.keys)
+          !isEmpty(association.options.foreignKey) &&
+          Array.isArray(association.options.foreignKey.keys)
         ) {
           const dep = queryGenerator.quoteTable(association.target);
           deps.push(dep);
