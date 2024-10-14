@@ -1028,6 +1028,7 @@ ${associationOwner._getAssociationDebugList()}`);
         return association.associationType === 'BelongsTo';
       });
 
+    const createdForeignKeysFromAssociations = new Set();
     for (const association of associations) {
       const foreignKey = association.options.foreignKey;
       const sourceKeyFields = foreignKey.keys.map(k => k.sourceKey);
@@ -1037,7 +1038,10 @@ ${associationOwner._getAssociationDebugList()}`);
         ? `${tableName.tableName}_${sourceKeyFields.join('_')}_fkey`
         : `${tableName.tableName}_${sourceKeyFields.join('_')}_${association.target.modelDefinition.table.tableName}_${targetKeyFields.join('_')}_fkey`;
 
-      if (!existingConstraints.some(constraint => constraint.constraintName === constraintName)) {
+      if (
+        !existingConstraints.some(constraint => constraint.constraintName === constraintName) &&
+        !createdForeignKeysFromAssociations.has(constraintName)
+      ) {
         await this.queryInterface.addConstraint(tableName.tableName, {
           fields: sourceKeyFields,
           type: 'FOREIGN KEY',
@@ -1049,6 +1053,7 @@ ${associationOwner._getAssociationDebugList()}`);
           onDelete: foreignKey.onDelete,
           onUpdate: foreignKey.onUpdate,
         });
+        createdForeignKeysFromAssociations.add(constraintName);
       }
     }
 
