@@ -164,7 +164,7 @@ describe(getTestDialectTeaser('Model.sync & Sequelize#sync'), () => {
     await sequelize.sync({ alter: true });
   });
 
-  it('should use constraintName provided for composite fk constraints whenprovided', async () => {
+  it('should use constraintName provided for composite fk constraints when provided', async () => {
     const User = sequelize.define('User', {
       userId: {
         type: DataTypes.INTEGER,
