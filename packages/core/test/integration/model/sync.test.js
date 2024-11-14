@@ -193,6 +193,7 @@ describe(getTestDialectTeaser('Model.sync & Sequelize#sync'), () => {
     const constraints = await sequelize.queryInterface.showConstraints(Address.getTableName(), {
       constraintType: 'FOREIGN KEY',
     });
+    console.log(constraints);
     const constraint = constraints.find(
       c =>
         c.constraintType === 'FOREIGN KEY' &&
