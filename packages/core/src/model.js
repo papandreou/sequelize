@@ -1035,9 +1035,10 @@ ${associationOwner._getAssociationDebugList()}`);
       const targetKeyFields = foreignKey.keys.map(k => k.targetKey);
       const modelKeysMatch = isEqual(sourceKeyFields, targetKeyFields);
       const constraintName =
-        association.options.foreignKey?.constraintName || modelKeysMatch
+        foreignKey.constraintName ||
+        (modelKeysMatch
           ? `${tableName.tableName}_${sourceKeyFields.join('_')}_fkey`
-          : `${tableName.tableName}_${sourceKeyFields.join('_')}_${association.target.modelDefinition.table.tableName}_${targetKeyFields.join('_')}_fkey`;
+          : `${tableName.tableName}_${sourceKeyFields.join('_')}_${association.target.modelDefinition.table.tableName}_${targetKeyFields.join('_')}_fkey`);
 
       if (
         !existingConstraints.some(constraint => constraint.constraintName === constraintName) &&
