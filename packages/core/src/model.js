@@ -1025,6 +1025,9 @@ ${associationOwner._getAssociationDebugList()}`);
         return association.options?.foreignKey?.keys?.length > 0;
       })
       .filter(association => {
+        return !association.options?.foreignKeyConstraints;
+      })
+      .filter(association => {
         return association.associationType === 'BelongsTo';
       });
 
