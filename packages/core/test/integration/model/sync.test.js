@@ -270,6 +270,74 @@ describe(getTestDialectTeaser('Model.sync & Sequelize#sync'), () => {
     expect(constraint).to.exist;
   });
 
+  it('should not create a foreign key constraint if the value is false', async () => {
+    const User = sequelize.define('User', {
+      userId: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+      },
+      tenantId: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+      },
+      username: DataTypes.STRING,
+    });
+    const Address = sequelize.define('Address', {
+      addressId: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+      },
+    });
+    Address.belongsTo(User, {
+      foreignKey: { keys: ['userId', 'tenantId'] },
+      foreignKeyConstraints: false,
+    });
+    await sequelize.sync({ alter: true });
+
+    const constraints = await sequelize.queryInterface.showConstraints(
+      Address.modelDefinition.table.tableName,
+    );
+    const constraint = constraints.find(
+      c =>
+        c.constraintType === 'FOREIGN KEY' && c.constraintName === 'Addresses_userId_tenantId_fkey',
+    );
+    expect(constraint).not.to.exist;
+  });
+
+  it('should not create a foreign key constraint if the value is false from a hasMany association', async () => {
+    const User = sequelize.define('User', {
+      userId: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+      },
+      tenantId: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+      },
+      username: DataTypes.STRING,
+    });
+    const Address = sequelize.define('Address', {
+      addressId: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+      },
+    });
+    User.hasMany(Address, {
+      foreignKey: { keys: ['userId', 'tenantId'] },
+      foreignKeyConstraints: false,
+    });
+    await sequelize.sync({ alter: true });
+
+    const constraints = await sequelize.queryInterface.showConstraints(
+      Address.modelDefinition.table.tableName,
+    );
+    const constraint = constraints.find(
+      c =>
+        c.constraintType === 'FOREIGN KEY' && c.constraintName === 'Addresses_userId_tenantId_fkey',
+    );
+    expect(constraint).not.to.exist;
+  });
+
   it('should create composite foreign key constraint even if table has alias', async () => {
     const User = sequelize.define('User', {
       userId: {
