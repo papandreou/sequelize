@@ -1,7 +1,7 @@
 import { map, SetView } from '@sequelize/utils';
+import isEmpty from 'lodash/isEmpty.js';
 import { inspect } from 'node:util';
 
-import isEmpty from 'lodash/isEmpty.js';
 // @ts-expect-error -- toposort-class definition will be added to sequelize/toposort later
 import Toposort from 'toposort-class';
 import type { AbstractDialect } from './abstract-dialect/dialect.js';
