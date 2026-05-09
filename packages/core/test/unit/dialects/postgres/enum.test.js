@@ -29,23 +29,7 @@ describe('PostgresQueryGenerator', () => {
       },
     });
 
-    const CustomEnumUser = sequelize.define('user', {
-      mood: DataTypes.ENUM({ values: ['happy', 'sad'], enumName: 'mood_type' }),
-    });
-
-    const CustomEnumSchemaUser = sequelize.define(
-      'user',
-      {
-        mood: DataTypes.ENUM({
-          values: ['happy', 'sad'],
-          enumName: 'mood_type',
-          enumSchema: 'shared',
-        }),
-      },
-      { schema: 'foo' },
-    );
-
-    return { FooUser, PublicUser, CustomEnumUser, CustomEnumSchemaUser };
+    return { FooUser, PublicUser };
   });
 
   describe('pgEnumName', () => {
@@ -70,25 +54,6 @@ describe('PostgresQueryGenerator', () => {
         sql.pgEnumName(FooUser.table, 'theirMood', FooUser.getAttributes().mood.type),
       ).to.equal('"foo"."enum_users_theirMood"');
     });
-
-    it('uses enumName when provided', () => {
-      const { PublicUser } = vars;
-
-      expect(
-        queryGenerator.pgEnumName(PublicUser.table, 'mood', { enumName: 'mood_type' }),
-      ).to.equal('"public"."mood_type"');
-    });
-
-    it('uses enumSchema when provided', () => {
-      const { PublicUser } = vars;
-
-      expect(
-        queryGenerator.pgEnumName(PublicUser.table, 'mood', {
-          enumName: 'mood_type',
-          enumSchema: 'shared',
-        }),
-      ).to.equal('"shared"."mood_type"');
-    });
   });
 
   describe('pgEnum', () => {
@@ -107,36 +72,6 @@ describe('PostgresQueryGenerator', () => {
         postgres: `DO 'BEGIN CREATE TYPE "public"."enum_users_theirMood" AS ENUM(''happy'', ''sad''); EXCEPTION WHEN duplicate_object THEN null; END';`,
       });
     });
-
-    it('uses custom enumName', () => {
-      const { CustomEnumUser } = vars;
-
-      expectsql(
-        queryGenerator.pgEnum(
-          CustomEnumUser.table,
-          'mood',
-          CustomEnumUser.getAttributes().mood.type,
-        ),
-        {
-          postgres: `DO 'BEGIN CREATE TYPE "public"."mood_type" AS ENUM(''happy'', ''sad''); EXCEPTION WHEN duplicate_object THEN null; END';`,
-        },
-      );
-    });
-
-    it('uses custom enumName and enumSchema', () => {
-      const { CustomEnumSchemaUser } = vars;
-
-      expectsql(
-        queryGenerator.pgEnum(
-          CustomEnumSchemaUser.table,
-          'mood',
-          CustomEnumSchemaUser.getAttributes().mood.type,
-        ),
-        {
-          postgres: `DO 'BEGIN CREATE TYPE "shared"."mood_type" AS ENUM(''happy'', ''sad''); EXCEPTION WHEN duplicate_object THEN null; END';`,
-        },
-      );
-    });
   });
 
   describe('pgEnumAdd', () => {
@@ -147,37 +82,6 @@ describe('PostgresQueryGenerator', () => {
         postgres:
           'ALTER TYPE "public"."enum_users_mood" ADD VALUE IF NOT EXISTS \'neutral\' AFTER \'happy\'',
       });
-    });
-
-    it('uses custom enumName', () => {
-      const { PublicUser } = vars;
-
-      expectsql(
-        queryGenerator.pgEnumAdd(PublicUser.table, 'mood', 'neutral', {
-          after: 'happy',
-          enumName: 'mood_type',
-        }),
-        {
-          postgres:
-            'ALTER TYPE "public"."mood_type" ADD VALUE IF NOT EXISTS \'neutral\' AFTER \'happy\'',
-        },
-      );
-    });
-
-    it('uses custom enumName and enumSchema', () => {
-      const { PublicUser } = vars;
-
-      expectsql(
-        queryGenerator.pgEnumAdd(PublicUser.table, 'mood', 'neutral', {
-          after: 'happy',
-          enumName: 'mood_type',
-          enumSchema: 'shared',
-        }),
-        {
-          postgres:
-            'ALTER TYPE "shared"."mood_type" ADD VALUE IF NOT EXISTS \'neutral\' AFTER \'happy\'',
-        },
-      );
     });
   });
 
@@ -217,40 +121,6 @@ describe('PostgresQueryGenerator', () => {
                      AND t.typname='enum_ta''"ble_attri''"bute'
                    GROUP BY 1`,
       });
-    });
-
-    it('uses custom enumName for type filter', () => {
-      const { FooUser } = vars;
-
-      expectsql(queryGenerator.pgListEnums(FooUser.table, 'mood', { enumName: 'mood_type' }), {
-        postgres: `SELECT t.typname enum_name, array_agg(e.enumlabel ORDER BY enumsortorder) enum_value
-                   FROM pg_type t
-                          JOIN pg_enum e ON t.oid = e.enumtypid
-                          JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
-                   WHERE n.nspname = 'foo'
-                     AND t.typname='mood_type'
-                   GROUP BY 1`,
-      });
-    });
-
-    it('uses enumSchema for schema filter', () => {
-      const { FooUser } = vars;
-
-      expectsql(
-        queryGenerator.pgListEnums(FooUser.table, 'mood', {
-          enumName: 'mood_type',
-          enumSchema: 'shared',
-        }),
-        {
-          postgres: `SELECT t.typname enum_name, array_agg(e.enumlabel ORDER BY enumsortorder) enum_value
-                   FROM pg_type t
-                          JOIN pg_enum e ON t.oid = e.enumtypid
-                          JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
-                   WHERE n.nspname = 'shared'
-                     AND t.typname='mood_type'
-                   GROUP BY 1`,
-        },
-      );
     });
   });
 });

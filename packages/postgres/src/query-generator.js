@@ -502,17 +502,15 @@ export class PostgresQueryGenerator extends PostgresQueryGeneratorTypeScript {
   pgEnumName(tableName, columnName, options = {}) {
     const tableDetails = this.extractTableDetails(tableName, options);
 
-    const rawEnumName = options.enumName ?? `enum_${tableDetails.tableName}_${columnName}`;
+    const enumName = `enum_${tableDetails.tableName}_${columnName}`;
     if (options.noEscape) {
-      return rawEnumName;
+      return enumName;
     }
 
-    const escapedEnumName = this.quoteIdentifier(rawEnumName);
+    const escapedEnumName = this.quoteIdentifier(enumName);
 
-    // enumSchema overrides the table's schema for the enum type name prefix
-    const schema = 'enumSchema' in options ? options.enumSchema : tableDetails.schema;
-    if (options.schema !== false && schema) {
-      return this.quoteIdentifier(schema) + tableDetails.delimiter + escapedEnumName;
+    if (options.schema !== false && tableDetails.schema) {
+      return this.quoteIdentifier(tableDetails.schema) + tableDetails.delimiter + escapedEnumName;
     }
 
     return escapedEnumName;
@@ -527,34 +525,19 @@ export class PostgresQueryGenerator extends PostgresQueryGeneratorTypeScript {
 
     if (tableDetails.tableName && attrName) {
       // pgEnumName escapes as an identifier, we want to escape it as a string
-      enumName = ` AND t.typname=${this.escape(this.pgEnumName(tableDetails.tableName, attrName, { noEscape: true, enumName: options?.enumName }))}`;
+      enumName = ` AND t.typname=${this.escape(this.pgEnumName(tableDetails.tableName, attrName, { noEscape: true }))}`;
     }
-
-    // enumSchema overrides the table's schema when looking up the enum type
-    const schema = options?.enumSchema !== undefined ? options.enumSchema : tableDetails.schema;
 
     return (
       'SELECT t.typname enum_name, array_agg(e.enumlabel ORDER BY enumsortorder) enum_value FROM pg_type t ' +
       'JOIN pg_enum e ON t.oid = e.enumtypid ' +
       'JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace ' +
-      `WHERE n.nspname = ${this.escape(schema)}${enumName} GROUP BY 1`
+      `WHERE n.nspname = ${this.escape(tableDetails.schema)}${enumName} GROUP BY 1`
     );
   }
 
   pgEnum(tableName, attr, dataType, options) {
-    // Merge enumName/enumSchema from the DataType's options (lower priority than explicit options)
-    const mergedOptions =
-      dataType instanceof ENUM &&
-      (dataType.options.enumName || dataType.options.enumSchema !== undefined)
-        ? {
-            ...(dataType.options.enumName !== undefined && { enumName: dataType.options.enumName }),
-            ...(dataType.options.enumSchema !== undefined && {
-              enumSchema: dataType.options.enumSchema,
-            }),
-            ...options,
-          }
-        : options;
-    const enumName = this.pgEnumName(tableName, attr, mergedOptions);
+    const enumName = this.pgEnumName(tableName, attr, options);
     let values;
 
     if (dataType instanceof ENUM && dataType.options.values) {
@@ -572,7 +555,7 @@ export class PostgresQueryGenerator extends PostgresQueryGeneratorTypeScript {
   }
 
   pgEnumAdd(tableName, attr, value, options) {
-    const enumName = this.pgEnumName(tableName, attr, options);
+    const enumName = this.pgEnumName(tableName, attr);
     let sql = `ALTER TYPE ${enumName} ADD VALUE IF NOT EXISTS `;
 
     sql += this.escape(value);

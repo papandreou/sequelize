@@ -434,9 +434,6 @@ export class ENUM<Members extends string> extends BaseTypes.ENUM<Members> {
       'expected queryGenerator to be PostgresQueryGenerator',
     );
 
-    return queryGenerator.pgEnumName(tableName, columnName, {
-      ...(this.options.enumName !== undefined && { enumName: this.options.enumName }),
-      ...(this.options.enumSchema !== undefined && { enumSchema: this.options.enumSchema }),
-    });
+    return queryGenerator.pgEnumName(tableName, columnName);
   }
 }
