@@ -576,7 +576,7 @@ export class PostgresQueryGenerator extends PostgresQueryGeneratorTypeScript {
 
     let sql = `DO ${this.escape(`BEGIN CREATE TYPE ${enumName} AS ${values}; EXCEPTION WHEN duplicate_object THEN null; END`)};`;
     if (Boolean(options) && options.force === true) {
-      sql = this.pgEnumDrop(null, null, enumName) + sql;
+      sql = this.pgEnumDrop(tableName, attr) + sql;
     }
 
     return sql;
