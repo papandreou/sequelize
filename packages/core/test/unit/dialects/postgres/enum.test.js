@@ -30,7 +30,7 @@ describe('PostgresQueryGenerator', () => {
     });
 
     const CustomEnumUser = sequelize.define('user', {
-      mood: DataTypes.ENUM({ values: ['happy', 'sad'], name: 'mood_type' }),
+      mood: DataTypes.ENUM({ values: ['happy', 'sad'], enumName: 'mood_type' }),
     });
 
     const CustomEnumSchemaUser = sequelize.define(
@@ -38,18 +38,18 @@ describe('PostgresQueryGenerator', () => {
       {
         mood: DataTypes.ENUM({
           values: ['happy', 'sad'],
-          name: 'mood_type',
-          schema: 'shared',
+          enumName: 'mood_type',
+          enumSchema: 'shared',
         }),
       },
       { schema: 'foo' },
     );
 
-    // schema only (no name) — uses auto-generated name but with custom schema
+    // enumSchema only (no enumName) — uses auto-generated name but with custom schema
     const EnumSchemaOnlyUser = sequelize.define(
       'user',
       {
-        mood: DataTypes.ENUM({ values: ['happy', 'sad'], schema: 'shared' }),
+        mood: DataTypes.ENUM({ values: ['happy', 'sad'], enumSchema: 'shared' }),
       },
       { schema: 'foo' },
     );

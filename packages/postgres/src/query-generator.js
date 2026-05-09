@@ -228,15 +228,17 @@ export class PostgresQueryGenerator extends PostgresQueryGeneratorTypeScript {
       const enumType = attribute.type.type || attribute.type;
       const values = enumType.options.values;
 
-      if (enumType.options.name || enumType.options.schema !== undefined) {
+      if (enumType.options.enumName || enumType.options.enumSchema !== undefined) {
         // When a custom enum name or schema is set, generate the final qualified type reference here
         // so that dataTypeMapping does not lose the custom name/schema when it later
         // replaces the ENUM(...) placeholder.
         const tableName = options?.table;
         const columnName = attribute.field || options?.key;
         type = this.pgEnumName(tableName, columnName, {
-          ...(enumType.options.name !== undefined && { enumName: enumType.options.name }),
-          ...(enumType.options.schema !== undefined && { enumSchema: enumType.options.schema }),
+          enumName: enumType.options.enumName,
+          ...(enumType.options.enumSchema !== undefined && {
+            enumSchema: enumType.options.enumSchema,
+          }),
         });
         if (attribute.type instanceof DataTypes.ARRAY) {
           type += '[]';
@@ -558,10 +560,12 @@ export class PostgresQueryGenerator extends PostgresQueryGeneratorTypeScript {
     // Merge enumName/enumSchema from the DataType's options (lower priority than explicit options)
     const mergedOptions =
       dataType instanceof ENUM &&
-      (dataType.options.name || dataType.options.schema !== undefined)
+      (dataType.options.enumName || dataType.options.enumSchema !== undefined)
         ? {
-            ...(dataType.options.name !== undefined && { enumName: dataType.options.name }),
-            ...(dataType.options.schema !== undefined && { enumSchema: dataType.options.schema }),
+            ...(dataType.options.enumName !== undefined && { enumName: dataType.options.enumName }),
+            ...(dataType.options.enumSchema !== undefined && {
+              enumSchema: dataType.options.enumSchema,
+            }),
             ...options,
           }
         : options;

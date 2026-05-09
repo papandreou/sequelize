@@ -35,12 +35,12 @@ export class PostgresQueryInterface extends PostgresQueryInterfaceTypescript {
       ) {
         const enumType = type instanceof DataTypes.ARRAY ? type.options.type : type;
         const enumOptions =
-          enumType.options.name || enumType.options.schema !== undefined
+          enumType.options.enumName || enumType.options.enumSchema
             ? {
                 ...options,
-                ...(enumType.options.name && { enumName: enumType.options.name }),
-                ...(enumType.options.schema !== undefined && {
-                  enumSchema: enumType.options.schema,
+                ...(enumType.options.enumName && { enumName: enumType.options.enumName }),
+                ...(enumType.options.enumSchema !== undefined && {
+                  enumSchema: enumType.options.enumSchema,
                 }),
               }
             : options;
@@ -110,8 +110,8 @@ export class PostgresQueryInterface extends PostgresQueryInterfaceTypescript {
         type instanceof DataTypes.ENUM ||
         (type instanceof DataTypes.ARRAY && enumType instanceof DataTypes.ENUM) // ARRAY sub type is ENUM
       ) {
-        const customEnumName = enumType.options.name;
-        const customEnumSchema = enumType.options.schema;
+        const customEnumName = enumType.options.enumName;
+        const customEnumSchema = enumType.options.enumSchema;
         const enumOptions =
           customEnumName || customEnumSchema !== undefined
             ? {
@@ -303,15 +303,15 @@ export class PostgresQueryInterface extends PostgresQueryInterfaceTypescript {
 
       const enumType = attribute.type;
       let sql;
-      if (enumType.options.name) {
+      if (enumType.options.enumName) {
         // Custom enum name: compute the fully-qualified type name with optional schema override
         const fullEnumName = this.queryGenerator.pgEnumName(
           { tableName, schema: options?.schema },
           attribute.attributeName,
           {
-            enumName: enumType.options.name,
-            ...(enumType.options.schema !== undefined && {
-              enumSchema: enumType.options.schema,
+            enumName: enumType.options.enumName,
+            ...(enumType.options.enumSchema !== undefined && {
+              enumSchema: enumType.options.enumSchema,
             }),
           },
         );

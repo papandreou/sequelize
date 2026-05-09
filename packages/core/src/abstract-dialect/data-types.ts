@@ -2215,22 +2215,22 @@ export interface EnumOptions<Member extends string> {
    * When set, this name is used instead of the auto-generated `enum_<table>_<column>` name,
    * allowing the same enum type to be shared across multiple columns or models.
    */
-  name?: string;
+  enumName?: string;
   /**
    * The schema that the enum type belongs to.
    * Currently only supported by PostgreSQL.
    * When set, this schema is used for the enum type instead of the table's schema.
    * This is useful when an enum type lives in a shared schema that is different from
    * the table's schema.
-   * Can be set without {@link name} to place the auto-generated enum type name in a specific schema.
+   * Requires {@link enumName} to also be set.
    */
-  schema?: string;
+  enumSchema?: string;
 }
 
 export interface NormalizedEnumOptions<Member extends string> {
   values: readonly Member[];
-  name?: string;
-  schema?: string;
+  enumName?: string;
+  enumSchema?: string;
 }
 
 /**
@@ -2279,8 +2279,8 @@ export class ENUM<Member extends string> extends AbstractDataType<Member> {
       first !== null &&
       'values' in first &&
       typeof (first as { values?: unknown }).values !== 'string';
-    const enumName = isOptionsBag ? (first as EnumOptions<Member>).name : undefined;
-    const enumSchema = isOptionsBag ? (first as EnumOptions<Member>).schema : undefined;
+    const enumName = isOptionsBag ? (first as EnumOptions<Member>).enumName : undefined;
+    const enumSchema = isOptionsBag ? (first as EnumOptions<Member>).enumSchema : undefined;
 
     if (values.length === 0) {
       throw new TypeError(
@@ -2320,8 +2320,8 @@ sequelize.define('MyModel', {
 
     this.options = {
       values,
-      ...(enumName !== undefined && { name: enumName }),
-      ...(enumSchema !== undefined && { schema: enumSchema }),
+      ...(enumName !== undefined && { enumName }),
+      ...(enumSchema !== undefined && { enumSchema }),
     };
   }
 
