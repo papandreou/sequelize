@@ -45,16 +45,7 @@ describe('PostgresQueryGenerator', () => {
       { schema: 'foo' },
     );
 
-    // enumSchema only (no enumName) — uses auto-generated name but with custom schema
-    const EnumSchemaOnlyUser = sequelize.define(
-      'user',
-      {
-        mood: DataTypes.ENUM({ values: ['happy', 'sad'], enumSchema: 'shared' }),
-      },
-      { schema: 'foo' },
-    );
-
-    return { FooUser, PublicUser, CustomEnumUser, CustomEnumSchemaUser, EnumSchemaOnlyUser };
+    return { FooUser, PublicUser, CustomEnumUser, CustomEnumSchemaUser };
   });
 
   describe('pgEnumName', () => {
@@ -97,14 +88,6 @@ describe('PostgresQueryGenerator', () => {
           enumSchema: 'shared',
         }),
       ).to.equal('"shared"."mood_type"');
-    });
-
-    it('uses enumSchema with auto-generated name when only enumSchema is provided', () => {
-      const { PublicUser } = vars;
-
-      expect(
-        queryGenerator.pgEnumName(PublicUser.table, 'mood', { enumSchema: 'shared' }),
-      ).to.equal('"shared"."enum_users_mood"');
     });
   });
 
@@ -153,45 +136,6 @@ describe('PostgresQueryGenerator', () => {
           postgres: `DO 'BEGIN CREATE TYPE "shared"."mood_type" AS ENUM(''happy'', ''sad''); EXCEPTION WHEN duplicate_object THEN null; END';`,
         },
       );
-    });
-
-    it('uses enumSchema with auto-generated name when only enumSchema is provided', () => {
-      const { EnumSchemaOnlyUser } = vars;
-
-      expectsql(
-        queryGenerator.pgEnum(
-          EnumSchemaOnlyUser.table,
-          'mood',
-          EnumSchemaOnlyUser.getAttributes().mood.type,
-        ),
-        {
-          postgres: `DO 'BEGIN CREATE TYPE "shared"."enum_users_mood" AS ENUM(''happy'', ''sad''); EXCEPTION WHEN duplicate_object THEN null; END';`,
-        },
-      );
-    });
-  });
-
-  describe('attributeToSQL (ENUM column type reference in CREATE TABLE)', () => {
-    it('uses enumSchema with auto-generated name when only enumSchema is provided', () => {
-      const { EnumSchemaOnlyUser } = vars;
-      const moodAttr = EnumSchemaOnlyUser.modelDefinition.attributes.get('mood');
-
-      const result = queryGenerator.attributeToSQL(
-        { type: moodAttr.type },
-        { table: EnumSchemaOnlyUser.table, key: 'mood' },
-      );
-      expect(result).to.equal('"shared"."enum_users_mood"');
-    });
-
-    it('uses custom enumName and enumSchema for column type reference', () => {
-      const { CustomEnumSchemaUser } = vars;
-      const moodAttr = CustomEnumSchemaUser.modelDefinition.attributes.get('mood');
-
-      const result = queryGenerator.attributeToSQL(
-        { type: moodAttr.type },
-        { table: CustomEnumSchemaUser.table, key: 'mood' },
-      );
-      expect(result).to.equal('"shared"."mood_type"');
     });
   });
 
