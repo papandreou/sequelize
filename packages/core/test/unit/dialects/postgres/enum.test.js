@@ -85,7 +85,7 @@ describe('PostgresQueryGenerator', () => {
       const { PublicUser } = vars;
 
       expect(
-        queryGenerator.pgEnumName(PublicUser.table, 'mood', { enumName: 'mood_type' }),
+        sql.pgEnumName(PublicUser.table, 'mood', { enumName: 'mood_type' }),
       ).to.equal('"public"."mood_type"');
     });
 
@@ -93,7 +93,7 @@ describe('PostgresQueryGenerator', () => {
       const { PublicUser } = vars;
 
       expect(
-        queryGenerator.pgEnumName(PublicUser.table, 'mood', {
+        sql.pgEnumName(PublicUser.table, 'mood', {
           enumName: 'mood_type',
           enumSchema: 'shared',
         }),
@@ -104,7 +104,7 @@ describe('PostgresQueryGenerator', () => {
       const { PublicUser } = vars;
 
       expect(
-        queryGenerator.pgEnumName(PublicUser.table, 'mood', { enumSchema: 'shared' }),
+        sql.pgEnumName(PublicUser.table, 'mood', { enumSchema: 'shared' }),
       ).to.equal('"shared"."enum_users_mood"');
     });
   });
@@ -131,7 +131,7 @@ describe('PostgresQueryGenerator', () => {
       const type = CustomEnumUser.getAttributes().mood.type;
 
       expectsql(
-        queryGenerator.pgEnum(CustomEnumUser.table, 'mood', type, {
+        sql.pgEnum(CustomEnumUser.table, 'mood', type, {
           enumName: type.options.name,
           enumSchema: type.options.schema,
         }),
@@ -146,7 +146,7 @@ describe('PostgresQueryGenerator', () => {
       const type = CustomEnumSchemaUser.getAttributes().mood.type;
 
       expectsql(
-        queryGenerator.pgEnum(CustomEnumSchemaUser.table, 'mood', type, {
+        sql.pgEnum(CustomEnumSchemaUser.table, 'mood', type, {
           enumName: type.options.name,
           enumSchema: type.options.schema,
         }),
@@ -161,7 +161,7 @@ describe('PostgresQueryGenerator', () => {
       const type = EnumSchemaOnlyUser.getAttributes().mood.type;
 
       expectsql(
-        queryGenerator.pgEnum(EnumSchemaOnlyUser.table, 'mood', type, {
+        sql.pgEnum(EnumSchemaOnlyUser.table, 'mood', type, {
           enumName: type.options.name,
           enumSchema: type.options.schema,
         }),
@@ -176,7 +176,7 @@ describe('PostgresQueryGenerator', () => {
       const type = CustomEnumSchemaUser.getAttributes().mood.type;
 
       expectsql(
-        queryGenerator.pgEnum(CustomEnumSchemaUser.table, 'mood', type, {
+        sql.pgEnum(CustomEnumSchemaUser.table, 'mood', type, {
           enumName: type.options.name,
           enumSchema: type.options.schema,
           force: true,
@@ -193,12 +193,12 @@ describe('PostgresQueryGenerator', () => {
       const { EnumSchemaOnlyUser } = vars;
       const moodAttr = EnumSchemaOnlyUser.modelDefinition.attributes.get('mood');
 
-      const raw = queryGenerator.attributeToSQL(
+      const raw = sql.attributeToSQL(
         { type: moodAttr.type },
         { table: EnumSchemaOnlyUser.table, key: 'mood' },
       );
       // dataTypeMapping strips the internal ENUM_NAMED() sentinel before emitting SQL
-      const result = queryGenerator.dataTypeMapping(EnumSchemaOnlyUser.table, 'mood', raw);
+      const result = sql.dataTypeMapping(EnumSchemaOnlyUser.table, 'mood', raw);
       expect(result).to.equal('"shared"."enum_users_mood"');
     });
 
@@ -206,12 +206,12 @@ describe('PostgresQueryGenerator', () => {
       const { CustomEnumSchemaUser } = vars;
       const moodAttr = CustomEnumSchemaUser.modelDefinition.attributes.get('mood');
 
-      const raw = queryGenerator.attributeToSQL(
+      const raw = sql.attributeToSQL(
         { type: moodAttr.type },
         { table: CustomEnumSchemaUser.table, key: 'mood' },
       );
       // dataTypeMapping strips the internal ENUM_NAMED() sentinel before emitting SQL
-      const result = queryGenerator.dataTypeMapping(CustomEnumSchemaUser.table, 'mood', raw);
+      const result = sql.dataTypeMapping(CustomEnumSchemaUser.table, 'mood', raw);
       expect(result).to.equal('"shared"."mood_type"');
     });
   });
@@ -222,7 +222,7 @@ describe('PostgresQueryGenerator', () => {
       const User = sq.define('user', {
         mood: DataTypes.ENUM({ values: ['happy', 'sad'], name: 'mood_type' }),
       });
-      const result = sq.dialect.queryGenerator.addColumnQuery(
+      const result = sq.dialect.sql.addColumnQuery(
         User.table,
         'mood',
         User.getAttributes().mood,
@@ -240,7 +240,7 @@ describe('PostgresQueryGenerator', () => {
           DataTypes.ENUM({ values: ['happy', 'sad'], name: 'mood_type', schema: 'shared' }),
         ),
       });
-      const result = sq.dialect.queryGenerator.addColumnQuery(
+      const result = sq.dialect.sql.addColumnQuery(
         User.table,
         'moods',
         User.getAttributes().moods,
@@ -310,7 +310,7 @@ describe('PostgresQueryGenerator', () => {
       const { PublicUser } = vars;
 
       expectsql(
-        queryGenerator.pgEnumAdd(PublicUser.table, 'mood', 'neutral', {
+        sql.pgEnumAdd(PublicUser.table, 'mood', 'neutral', {
           after: 'happy',
           enumName: 'mood_type',
         }),
@@ -325,7 +325,7 @@ describe('PostgresQueryGenerator', () => {
       const { PublicUser } = vars;
 
       expectsql(
-        queryGenerator.pgEnumAdd(PublicUser.table, 'mood', 'neutral', {
+        sql.pgEnumAdd(PublicUser.table, 'mood', 'neutral', {
           after: 'happy',
           enumName: 'mood_type',
           enumSchema: 'shared',
@@ -343,9 +343,9 @@ describe('PostgresQueryGenerator', () => {
       const { FooUser } = vars;
 
       expectsql(sql.pgListEnums(FooUser.table, 'mood'), {
-        postgres: `SELECT t.typname enum_name, array_agg(e.enumlabel ORDER BY enumsortorder) enum_value
+        postgres: `SELECT t.typname enum_name, COALESCE(array_agg(e.enumlabel ORDER BY enumsortorder) FILTER (WHERE e.enumlabel IS NOT NULL), ARRAY[]::text[]) enum_value
                    FROM pg_type t
-                          JOIN pg_enum e ON t.oid = e.enumtypid
+                          LEFT JOIN pg_enum e ON t.oid = e.enumtypid
                           JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
                    WHERE n.nspname = 'foo'
                      AND t.typname='enum_users_mood'
@@ -355,9 +355,9 @@ describe('PostgresQueryGenerator', () => {
 
     it('uses the default schema if no options given', () => {
       expectsql(sql.pgListEnums(), {
-        postgres: `SELECT t.typname enum_name, array_agg(e.enumlabel ORDER BY enumsortorder) enum_value
+        postgres: `SELECT t.typname enum_name, COALESCE(array_agg(e.enumlabel ORDER BY enumsortorder) FILTER (WHERE e.enumlabel IS NOT NULL), ARRAY[]::text[]) enum_value
                    FROM pg_type t
-                          JOIN pg_enum e ON t.oid = e.enumtypid
+                          LEFT JOIN pg_enum e ON t.oid = e.enumtypid
                           JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
                    WHERE n.nspname = 'public'
                    GROUP BY 1`,
@@ -366,9 +366,9 @@ describe('PostgresQueryGenerator', () => {
 
     it('is not vulnerable to sql injection', () => {
       expectsql(sql.pgListEnums({ tableName: `ta'"ble`, schema: `sche'"ma` }, `attri'"bute`), {
-        postgres: `SELECT t.typname enum_name, array_agg(e.enumlabel ORDER BY enumsortorder) enum_value
+        postgres: `SELECT t.typname enum_name, COALESCE(array_agg(e.enumlabel ORDER BY enumsortorder) FILTER (WHERE e.enumlabel IS NOT NULL), ARRAY[]::text[]) enum_value
                    FROM pg_type t
-                          JOIN pg_enum e ON t.oid = e.enumtypid
+                          LEFT JOIN pg_enum e ON t.oid = e.enumtypid
                           JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
                    WHERE n.nspname = 'sche''"ma'
                      AND t.typname='enum_ta''"ble_attri''"bute'
@@ -379,7 +379,7 @@ describe('PostgresQueryGenerator', () => {
     it('uses custom enumName for type filter', () => {
       const { FooUser } = vars;
 
-      expectsql(queryGenerator.pgListEnums(FooUser.table, 'mood', { enumName: 'mood_type' }), {
+      expectsql(sql.pgListEnums(FooUser.table, 'mood', { enumName: 'mood_type' }), {
         postgres: `SELECT t.typname enum_name, array_agg(e.enumlabel ORDER BY enumsortorder) enum_value
                    FROM pg_type t
                           JOIN pg_enum e ON t.oid = e.enumtypid
@@ -394,7 +394,7 @@ describe('PostgresQueryGenerator', () => {
       const { FooUser } = vars;
 
       expectsql(
-        queryGenerator.pgListEnums(FooUser.table, 'mood', {
+        sql.pgListEnums(FooUser.table, 'mood', {
           enumName: 'mood_type',
           enumSchema: 'shared',
         }),
