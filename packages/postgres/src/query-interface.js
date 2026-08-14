@@ -235,9 +235,14 @@ export class PostgresQueryInterface extends PostgresQueryInterfaceTypescript {
               );
             }
           }
-
-          enumIdx++;
         }
+
+        // Continue to the next enum. This must run for every branch above (including the "doesn't
+        // exist yet" one, which has no enumIdx++ of its own) -- otherwise enumIdx and results[]
+        // desync for every enum attribute that follows on the same table, since ensureEnums()
+        // processes potentially several enum-typed attributes per call and results[] has exactly
+        // one entry per enum attribute, in attribute order.
+        enumIdx++;
       }
     }
 
