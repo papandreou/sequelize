@@ -21,7 +21,7 @@
   "sideEffects": false,
   "homepage": "https://sequelize.org",
   "license": "MIT",
-  "name": "@sequelize/postgres",
+  "name": "sequelize-postgres-papandreou",
   "repository": "https://github.com/sequelize/sequelize",
   "scripts": {
     "build": "../../build-packages.mjs postgres",
@@ -32,13 +32,13 @@
     "sync-exports": "../../dev/sync-exports.mjs ./src"
   },
   "type": "commonjs",
-  "version": "7.0.0-alpha.48",
+  "version": "7.0.0-alpha.48-patch1",
   "publishConfig": {
     "access": "public"
   },
   "dependencies": {
-    "@sequelize/core": "workspace:*",
-    "@sequelize/utils": "workspace:*",
+    "@sequelize/core": "7.0.0-alpha.48-patch1",
+    "@sequelize/utils": "7.0.0-alpha.48",
     "@types/pg": "^8.11.14",
     "lodash": "^4.18.1",
     "pg": "^8.20.0",

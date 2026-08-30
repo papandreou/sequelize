@@ -1,7 +1,7 @@
 {
-  "name": "@sequelize/core",
+  "name": "sequelize-core-papandreou",
   "description": "Sequelize is a promise-based Node.js ORM tool for Postgres, MySQL, MariaDB, SQLite, Microsoft SQL Server, Amazon Redshift, Snowflake’s Data Cloud, Db2, Oracle, and IBM i. It features solid transaction support, relations, eager and lazy loading, read replication and more.",
-  "version": "7.0.0-alpha.48",
+  "version": "7.0.0-alpha.48-patch1",
   "funding": [
     {
       "type": "opencollective",
@@ -48,7 +48,7 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@sequelize/utils": "workspace:*",
+    "@sequelize/utils": "7.0.0-alpha.48",
     "@types/debug": "^4.1.13",
     "@types/validator": "^13.15.10",
     "ansis": "^3.17.0",
