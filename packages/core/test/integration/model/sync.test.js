@@ -450,6 +450,47 @@ describe(getTestDialectTeaser('Model.sync & Sequelize#sync'), () => {
     expect(constraint).to.exist;
   });
 
+  it('honors an explicit onDelete/onUpdate for composite foreign keys created by sync', async () => {
+    // Regression test: the composite-key branch of Model.sync() computed onDelete/onUpdate as
+    // `foreignKey.onDelete || foreignKey.allowNull ? 'SET NULL' : 'CASCADE'`, which -- due to
+    // operator precedence -- evaluates as `(foreignKey.onDelete || foreignKey.allowNull) ? 'SET
+    // NULL' : 'CASCADE'`. Since any explicitly configured onDelete/onUpdate is a truthy string,
+    // this always produced 'SET NULL', silently discarding the configured action (e.g. 'CASCADE').
+    const User = sequelize.define('User', {
+      userId: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+      },
+      tenantId: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+      },
+      username: DataTypes.STRING,
+    });
+    const Address = sequelize.define('Address', {
+      addressId: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+      },
+    });
+    Address.belongsTo(User, {
+      foreignKey: { keys: ['userId', 'tenantId'], onDelete: 'CASCADE', onUpdate: 'CASCADE' },
+    });
+
+    await sequelize.sync({ alter: true });
+    const constraints = await sequelize.queryInterface.showConstraints(Address.getTableName());
+    const constraint = constraints.find(
+      c =>
+        c.constraintType === 'FOREIGN KEY' && c.constraintName === 'Addresses_userId_tenantId_fkey',
+    );
+    expect(constraint).to.exist;
+    expect(constraint.deleteAction).to.equal('CASCADE');
+    if (dialect !== 'sqlite3') {
+      // sqlite3's showConstraints does not report the update action.
+      expect(constraint.updateAction).to.equal('CASCADE');
+    }
+  });
+
   it('creates one unique index for unique:true column', async () => {
     const User = sequelize.define('testSync', {
       email: {
