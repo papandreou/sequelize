@@ -9,7 +9,9 @@ This repo publishes two packages under private names — `sequelize-core-papandr
 (from `packages/core`) and `sequelize-postgres-papandreou` (from `packages/postgres`)
 — to the **public** npm registry (`registry.npmjs.org`), not the corporate Artifactory
 mirror this machine normally uses. Consumers (e.g. the `peakon/api` repo) install them
-via npm aliasing: `"@sequelize/core": "npm:sequelize-core-papandreou@^7.0.0-alpha.44-patchN"`.
+via npm/pnpm aliasing: `"@sequelize/core": "npm:sequelize-core-papandreou@^7.0.0-alpha.44-patchN"`.
+Both npm and pnpm consumers are supported as of patch5 — see step 3 for the
+pnpm-specific dependency-naming requirement that makes this work.
 
 Do this on the user's actual release branch (e.g. `sequelize-core-papandreouN`), not on
 a fresh branch off `main` — that branch's `packages/{core,postgres}/package.json` already
@@ -67,7 +69,18 @@ Bump the number after `-patch` in **both** `version` fields, and in postgres's
 dependency on core (all three must match):
 
 - `packages/core/package.json`: `"version"`
-- `packages/postgres/package.json`: `"version"` and `"dependencies"."@sequelize/core"`
+- `packages/postgres/package.json`: `"version"` and `"dependencies"."sequelize-core-papandreou"`
+
+Postgres's dependency on core **must** be keyed as `sequelize-core-papandreou` (the
+real, published fork package name), not `@sequelize/core`. Since patch5, pnpm-based
+consumers install these packages via `npm:` aliasing (e.g.
+`"@sequelize/postgres": "npm:sequelize-postgres-papandreou@..."`), and pnpm resolves
+each package's *own* manifest dependencies literally against the registry — it doesn't
+hoist/dedup the way npm does. A `"@sequelize/core": "<fork-only-version>"` entry makes
+pnpm try to fetch that version from the real, unaliased `@sequelize/core` package
+(which doesn't have fork patch versions), failing with `ERR_PNPM_NO_MATCHING_VERSION`.
+npm tolerated the old naming; pnpm does not. Don't regress this back to
+`@sequelize/core` when copying forward from an older patch's diff.
 
 `packages/postgres/package.json`'s `"@sequelize/utils"` dependency version does *not*
 bump — only core's own alpha version changes per release, not utils'.
@@ -107,6 +120,14 @@ the process can be killed before the user finishes the browser flow. Read the ou
 file for the login URL, give it to the user, and wait for them to complete it
 (including 2FA) before re-checking `npm whoami`.
 
+`npm login` writes its fresh token to the **global** `~/.npmrc`, not to
+`~/.npmrc-public` — even when invoked with `--registry=https://registry.npmjs.org/`.
+If `~/.npmrc-public` already has a (now-stale) `//registry.npmjs.org/:_authToken=...`
+line, that more-specific project-level value wins over the new global one and
+`npm whoami` will still 401 after a "successful" login. Fix: copy the new token from
+`~/.npmrc`'s `//registry.npmjs.org/:_authToken=...` line into `~/.npmrc-public`'s line
+of the same name, then re-check `npm whoami`.
+
 ### 5. Publish
 
 ```sh
@@ -141,7 +162,22 @@ Don't push unless asked — confirm with the user first.
 - Never publish without first confirming `npm publish --dry-run`'s "Publishing to
   ..." line says `registry.npmjs.org`.
 - `ibm_db`'s install failure on Apple Silicon is expected; don't try to fix it.
+- Step 1's plain `yarn` will also fail at the resolution step
+  (`Workspace not found (@sequelize/core@workspace:*)`), because this branch's
+  `packages/core/package.json` `"name"` is permanently committed as
+  `sequelize-core-papandreou`, breaking sibling packages (mysql, mariadb, etc.) that
+  still declare `"@sequelize/core": "workspace:*"`. This is expected and harmless like
+  the `ibm_db` failure, as long as `node_modules` already has working
+  `@sequelize/core`/`@sequelize/postgres` symlinks from an earlier install — check with
+  `ls -la node_modules/@sequelize/core`. Don't try to "fix" it by renaming things back;
+  just proceed to step 2.
+- Postgres's dependency on core must be named `sequelize-core-papandreou`, not
+  `@sequelize/core` — see step 3 for why (pnpm compatibility). Don't regress this when
+  copying forward from an older patch's diff.
 - The saved patch file in step 2 must come from a diff taken *before* reverting — the
   same patch is applied in both directions.
 - A background `npm login` must survive between tool calls (`run_in_background:
   true`), or the login prompt dies before the user can complete it.
+- `npm login` updates the global `~/.npmrc`, not `~/.npmrc-public` — copy the new
+  `//registry.npmjs.org/:_authToken=...` value over manually or `npm whoami` keeps
+  401ing even after a "successful" login.
