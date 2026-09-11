@@ -22,7 +22,9 @@ type BooleanConnectionOptions = PickByType<PostgresConnectionOptions, boolean>;
 
 const BOOLEAN_CONNECTION_OPTION_MAP = {
   binary: undefined,
+  enableChannelBinding: undefined,
   keepAlive: undefined,
+  pipeline: undefined,
   ssl: undefined,
   statement_timeout: undefined,
 } as const satisfies Record<keyof BooleanConnectionOptions, undefined>;
@@ -51,5 +53,6 @@ export const CONNECTION_OPTION_NAMES = getSynchronizedTypeKeys<PostgresConnectio
   ...STRING_CONNECTION_OPTION_MAP,
   ...BOOLEAN_CONNECTION_OPTION_MAP,
   ...NUMBER_CONNECTION_OPTION_MAP,
+  sslnegotiation: undefined,
   stream: undefined,
 });
