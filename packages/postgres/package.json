@@ -32,12 +32,12 @@
     "sync-exports": "../../dev/sync-exports.mjs ./src"
   },
   "type": "commonjs",
-  "version": "7.0.0-alpha.48-patch6",
+  "version": "7.0.0-alpha.48-patch8",
   "publishConfig": {
     "access": "public"
   },
   "dependencies": {
-    "sequelize-core-papandreou": "7.0.0-alpha.48-patch6",
+    "sequelize-core-papandreou": "7.0.0-alpha.48-patch8",
     "@sequelize/utils": "7.0.0-alpha.48",
     "@types/pg": "^8.23.1",
     "lodash": "^4.18.1",
